@@ -1,0 +1,7 @@
+<library path="lib/libros_dvs_emulator_nodelet">
+  <class name="ros_dvs_emulator/RosDvsEmulatorNodelet" type="ros_dvs_emulator::RosDvsEmulatorNodelet" base_class_type="nodelet::Nodelet">
+    <description> 
+      A nodelet wrapper for the ros_dvs_emulator.
+    </description>
+  </class>
+</library>
