@@ -1,0 +1,9 @@
+<launch>
+  <!-- emulator -->
+  <node name="ros_dvs_emulator" pkg="ros_dvs_emulator" type="ros_dvs_emulator" output="screen" launch-prefix="gdb -ex run --args">
+  </node>
+
+  <!-- configure -->
+  <!-- <node name="rqt_reconfigure" pkg="rqt_reconfigure" type="rqt_reconfigure"/> -->
+
+</launch>
