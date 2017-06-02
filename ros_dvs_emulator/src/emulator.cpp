@@ -25,10 +25,11 @@ namespace ros_dvs_emulator {
 
 RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private) :
     nh_(nh),
-    dvsThresh(35), //2DO: include in config file
+    dvsThresh(dvs_threshold), //2DO: include in config file
     tProcess(0),
     tPublish(0),
-    framesCount(0)
+    framesCount(0),
+    eventCount(0)
 {
     dataShrd = dataShrdMain;
 
@@ -45,11 +46,12 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private)
 
 RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private, shared_mem_emul * dataShrd_) :
     nh_(nh),
-    dvsThresh(35), //2DO: include in config file
+    dvsThresh(dvs_threshold), //2DO: include in config file
     dataShrd(dataShrd_),
     tProcess(0),
     tPublish(0),
-    framesCount(0)
+    framesCount(0),
+    eventCount(0)
 {
 //    ROS_INFO( "testing shared mem access in emulator: aIsNew: %i timeA: %0.2f imageA[12]: %i", dataShrd->aIsNew, dataShrd->timeA, (int) dataShrd->imageA[12] );
 
@@ -89,11 +91,11 @@ RosDvsEmulator::~RosDvsEmulator()
 
 void RosDvsEmulator::readout()
 {
-    ROS_INFO( "testing shared mem access in emulator: aIsNew: %i timeA: %0.2f imageA[12]: %i", dataShrd->aIsNew, dataShrd->timeA, (int) dataShrd->imageA[12] );
-    std::cout << "reading out" << std::endl;
+//    ROS_INFO( "testing shared mem access in emulator: aIsNew: %i timeA: %0.2f imageA[12]: %i", dataShrd->aIsNew, dataShrd->timeA, (int) dataShrd->imageA[12] );
+//    std::cout << "reading out" << std::endl;
     dvs_msgs::EventArrayPtr event_array_msg(new dvs_msgs::EventArray());
-    event_array_msg->height = 480; //2DO: get dynamically
-    event_array_msg->width = 640;
+    event_array_msg->height = image_height; //2DO: get dynamically
+    event_array_msg->width = image_width;
 
     while (running_)
     {
@@ -103,13 +105,18 @@ void RosDvsEmulator::readout()
             t1.start();
 
             int temp_lum = 0;
-            int sizePic = 640*480;
+            int sizePic = event_array_msg->height*event_array_msg->width;
             // compute luminance difference for each pixel
             // to do that: lock mutex while reading
-//            std::cout << "locking the mutex" << std::endl;
             {
                 bip::scoped_lock<bip::interprocess_mutex> lock(dataShrd->mutex);
-                //            std::cout << "mutex now locked" << std::endl;
+
+                if (!dataShrd->frameUpdated)
+                {
+                    // wait till notified by frame saving process if no new frame is available to process
+                    dataShrd->condNew.wait(lock);
+                }
+
                 for (int ii=0; ii<sizePic; ++ii)
                 {
                     // currently not rounding correctly, just to get visualization through ROS
@@ -127,8 +134,8 @@ void RosDvsEmulator::readout()
                     if (temp_lum>dvsThresh)
                     {
                         dvs_msgs::Event e;
-                        e.y = 480 - (int) ii/640;
-                        e.x = ii%640;
+                        e.y = event_array_msg->height - (int) ii/event_array_msg->width;
+                        e.x = ii%event_array_msg->width;
                         if (dataShrd->aIsNew)
                         {
                             e.ts = ros::Time(dataShrd->timeA - (dataShrd->timeA - dataShrd->timeB)/2);
@@ -143,38 +150,32 @@ void RosDvsEmulator::readout()
                         event_array_msg->events.push_back(e);
                     }
                 }
+                //flag that the current new frame has been used
+                dataShrd->frameUpdated = false;
             }
             t1.stop();
             tProcess += t1.getElapsedTimeInMilliSec();
             t1.start();
 
-//            std::cout << "unlocked in emulator" << std::endl;
+            eventCount += event_array_msg->events.size();
+
             event_array_pub_.publish(event_array_msg);
             event_array_msg->events.clear();
-
-            //          // throttle event messages
-            //          if (boost::posix_time::microsec_clock::local_time() > next_send_time || current_config_.streaming_rate == 0)
-            //          {
-            //            event_array_pub_.publish(event_array_msg);
-            //            event_array_msg->events.clear();
-            //            if (current_config_.streaming_rate > 0)
-            //            {
-            //              next_send_time += delta_;
-            //            }
-            //          }
-
-
 
             t1.stop();
             tPublish += t1.getElapsedTimeInMilliSec();
 
             ++framesCount;
-            if ((tPublish + tProcess) >= 1000)
+            if (framesCount == 60) //((tPublish + tProcess) >= 1000)
             {
-                std::cout << " Average times: \n process - \t" << tProcess/framesCount
-                          << "ms, \n publish - \t"           << tPublish/framesCount
-                          << "ms, \n total - \t"            << (tPublish+tProcess)/framesCount
-                          << "ms" << std::endl;
+                std::cout << "Amount of events in array: " << eventCount << std::endl;
+                framesCount = 0;
+                eventCount = 0;
+
+//                std::cout << " Average times: \n process - \t" << tProcess/framesCount
+//                          << "ms, \n publish - \t"           << tPublish/framesCount
+//                          << "ms, \n total - \t"            << (tPublish+tProcess)/framesCount
+//                          << "ms" << std::endl;
                 tProcess = 0;
                 tPublish = 0;
                 framesCount = 0;

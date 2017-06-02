@@ -27,6 +27,7 @@
 #include <boost/interprocess/mapped_region.hpp>
 #include <boost/interprocess/sync/scoped_lock.hpp>
 #include <boost/interprocess/sync/interprocess_mutex.hpp>
+#include <boost/interprocess/sync/interprocess_condition.hpp>
 
 // messages
 #include <dvs_msgs/Event.h>
@@ -36,6 +37,9 @@
 // execution time measurement
 #include "ros_dvs_emulator/Timer.h"
 
+// dvs configuration file
+#include "ros_dvs_emulator/config_dvs.h"
+
 struct shared_mem_emul
 {
     shared_mem_emul() :
@@ -44,19 +48,26 @@ struct shared_mem_emul
         timeB(0),
         imageA(),
         imageB(),
+        frameUpdated(false),
         mutex()
     {
     }
 
+    //boolean differentiating between old and new frame
     bool aIsNew;
     double timeA;
     double timeB;
-    unsigned char imageA[640*480*4];
-    unsigned char imageB[640*480*4];
+    unsigned char imageA[image_width*image_height*4];
+    unsigned char imageB[image_width*image_height*4];
+
+    //boolean updated when new frame was written
+    bool frameUpdated;
 
     //Mutex to protect access to the queue
     boost::interprocess::interprocess_mutex mutex;
 
+    //Condition to wait when the frame was not updated
+    boost::interprocess::interprocess_condition  condNew;
 };
 
 namespace ros_dvs_emulator {
@@ -86,6 +97,8 @@ private:
   double tProcess;
   double tPublish;
   unsigned framesCount;
+
+  unsigned eventCount;
 
 
 };

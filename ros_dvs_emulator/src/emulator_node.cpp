@@ -20,6 +20,9 @@
 #include <boost/interprocess/sync/interprocess_mutex.hpp>
 
 #include <ros/ros.h>
+
+#define image_width 320 //640
+#define image_height 240 //480
 #include "ros_dvs_emulator/emulator.h"
 
 namespace bip = boost::interprocess;
@@ -45,7 +48,7 @@ int main(int argc, char* argv[])
     // initialize shared memory
     //Open the shared memory object.
     bip::shared_memory_object shm
-            (bip::open_only       //open only open_or_create
+            (bip::open_or_create       //open_only or open_or_create
              ,"shared_memory"           //name
              ,bip::read_write   //read-write mode
              );
