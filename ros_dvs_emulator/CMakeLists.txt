@@ -29,7 +29,7 @@ target_link_libraries(ros_dvs_emulator
   ${catkin_LIBRARIES}
   rt
   ${Boost_LIBRARIES}
-  
+
 )
 
 # link the executable to the necesarry libs

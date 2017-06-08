@@ -11,7 +11,7 @@
 // configure pixelBuffer and dvsEmulator:
 #define pixel_format GL_BGRA //Fastest option for map from vram to ram
 #define channel_size 4
-#define dvs_threshold 150
+#define dvs_threshold 60
 
 #endif // CONFIG_DVS_H
 
