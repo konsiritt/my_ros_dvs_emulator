@@ -18,7 +18,7 @@
 
 #include <nodelet/nodelet.h>
 
-#include "dvs_renderer/renderer.h"
+#include "ros_dvs_renderer/renderer.h"
 
 namespace dvs_renderer {
 

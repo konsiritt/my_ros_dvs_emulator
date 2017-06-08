@@ -15,7 +15,7 @@
 
 #include <pluginlib/class_list_macros.h>
 
-#include "dvs_renderer/renderer_nodelet.h"
+#include "ros_dvs_renderer/renderer_nodelet.h"
 
 namespace dvs_renderer
 {

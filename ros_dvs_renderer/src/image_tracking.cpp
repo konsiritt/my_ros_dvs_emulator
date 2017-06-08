@@ -16,7 +16,7 @@
 #include <opencv2/video/tracking.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
 
-#include "dvs_renderer/image_tracking.h"
+#include "ros_dvs_renderer/image_tracking.h"
 
 namespace dvs_renderer {
 

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with DVS-ROS.  If not, see <http://www.gnu.org/licenses/>.
 
-#include "dvs_renderer/renderer.h"
+#include "ros_dvs_renderer/renderer.h"
 
 int main(int argc, char* argv[])
 {

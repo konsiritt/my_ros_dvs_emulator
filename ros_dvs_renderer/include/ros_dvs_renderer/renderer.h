@@ -43,7 +43,6 @@ public:
 private:
   ros::NodeHandle nh_;
 
-  void cameraInfoCallback(const sensor_msgs::CameraInfo::ConstPtr& msg);
   void eventsCallback(const dvs_msgs::EventArray::ConstPtr& msg);
   void imageCallback(const sensor_msgs::Image::ConstPtr& msg);
 
@@ -53,7 +52,6 @@ private:
   cv::Mat camera_matrix_, dist_coeffs_;
 
   ros::Subscriber event_sub_;
-  ros::Subscriber camera_info_sub_;
 
   image_transport::Publisher image_pub_;
   image_transport::Publisher undistorted_image_pub_;

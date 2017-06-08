@@ -1,6 +1,6 @@
 <launch>
   <!-- visualization -->
-  <node name="my_dvs_renderer" pkg="ros_dvs_renderer" type="ros_dvs_renderer" output="screen">
+  <node name="my_dvs_renderer" pkg="ros_dvs_renderer" type="ros_dvs_renderer" output="screen" launch-prefix="gdb -ex run --args">
     <param name="display_method" value="red-blue"/>
     <remap from="events" to="/dvs/events" />
     <remap from="image" to="/dvs/image_raw" />
