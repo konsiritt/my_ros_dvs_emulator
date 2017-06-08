@@ -26,7 +26,7 @@ namespace ros_dvs_benchmark {
 BenchEmul::BenchEmul(ros::NodeHandle & nh, ros::NodeHandle nh_private) :
     nh_(nh),
     iterations(1000),
-    pubFreq(100)
+    pubFreq(200)
 {
 
     // set namespace
@@ -67,10 +67,15 @@ void BenchEmul::runBenchmark ()
 
     for (int packSize = 10; packSize < 40150; packSize+=5000)
     {
+        ros::Rate loopRate(pubFreq);
+
         std::cout << "------ publishing packets with " << packSize << " events ------" << std::endl;
         for (unsigned ii=0; ii<iterations; ++ii)
         {
-            publishPacket(packSize, pubFreq);
+            publishPacket(packSize);
+
+            ros::spinOnce();
+            loopRate.sleep();
         }
         ros::Duration(1.0).sleep();
         clientFrequency.call(srvFrequency);
@@ -88,10 +93,8 @@ void BenchEmul::runBenchmark ()
     ros::shutdown();
 }
 
-void BenchEmul::publishPacket(unsigned packetSize, unsigned loopFreq)
+void BenchEmul::publishPacket(unsigned packetSize)
 {
-    ros::Rate loopRate(loopFreq);
-
     std::random_device rd; // obtain a random number from hardware
     std::mt19937 eng(rd()); // seed the generator
     std::uniform_int_distribution<> distrW(0, image_width-1); // define the range
@@ -114,9 +117,7 @@ void BenchEmul::publishPacket(unsigned packetSize, unsigned loopFreq)
     event_array_pub_.publish(event_array_msg);  
     event_array_msg->events.clear();
 
-    ros::spinOnce();
 
-    loopRate.sleep();
 
 }
 

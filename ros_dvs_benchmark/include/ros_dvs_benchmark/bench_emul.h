@@ -32,7 +32,7 @@ private:
 
     void runBenchmark ();
 
-    void publishPacket(unsigned packetSize, unsigned loopFreq);
+    void publishPacket(unsigned packetSize);
 
     ros::NodeHandle nh_;
     ros::Publisher event_array_pub_;
