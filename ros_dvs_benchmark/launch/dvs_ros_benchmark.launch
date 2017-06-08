@@ -1,0 +1,14 @@
+<launch>
+	<!-- Start Subscriber -->
+	<node name="subscriber" pkg="ros_dvs_benchmark" type="ros_bench_subscr" 
+		required="true"
+		output="screen">
+	<remap from="events" to="/dvs/events" />
+	</node>
+
+	<!-- Start Publisher -->
+	<node name="publisher" pkg="ros_dvs_benchmark" type="ros_bench_emul" 
+		required="true"
+		output="screen">
+	</node>
+</launch>

@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>ros_dvs_benchmark</name>
+  <version>0.0.0</version>
+  <description>The ros_dvs_benchmark package</description>
+  <maintainer email="ritt@mytum.de">Konstantin Ritt</maintainer>
+  <license>GNU GPL</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>catkin_simple</buildtool_depend>
+
+  <depend>roscpp</depend>
+  <depend>ros_dvs_service</depend>
+  <depend>dvs_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>nodelet</depend>
+
+</package>
