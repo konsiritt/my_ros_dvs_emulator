@@ -26,6 +26,7 @@ namespace ros_dvs_emulator {
 RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private) :
     nh_(nh),
     dvsThresh(dvs_threshold), //2DO: include in config file
+    streamingRate(100),
     tProcess(0),
     tPublish(0),
     framesCount(0),
@@ -47,6 +48,7 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private)
 RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private, shared_mem_emul * dataShrd_) :
     nh_(nh),
     dvsThresh(dvs_threshold), //2DO: include in config file
+    streamingRate(100),
     dataShrd(dataShrd_),
     tProcess(0),
     tPublish(0),
@@ -96,6 +98,9 @@ void RosDvsEmulator::readout()
     dvs_msgs::EventArrayPtr event_array_msg(new dvs_msgs::EventArray());
     event_array_msg->height = image_height; //2DO: get dynamically
     event_array_msg->width = image_width;
+
+    boost::posix_time::ptime next_send_time = boost::posix_time::microsec_clock::local_time();
+    boost::posix_time::time_duration delta_ = boost::posix_time::microseconds(1e6/streamingRate);
 
     while (running_)
     {
@@ -157,30 +162,45 @@ void RosDvsEmulator::readout()
             tProcess += t1.getElapsedTimeInMilliSec();
             t1.start();
 
-            eventCount += event_array_msg->events.size();
+            //            eventCount += event_array_msg->events.size();
 
-            event_array_pub_.publish(event_array_msg);
-            event_array_msg->events.clear();
+
+            // throttle event messages
+            if (boost::posix_time::microsec_clock::local_time() > next_send_time || streamingRate == 0)
+            {
+                eventCount += event_array_msg->events.size();
+
+                event_array_pub_.publish(event_array_msg);
+                event_array_msg->events.clear();
+                if (streamingRate > 0)
+                {
+                    next_send_time += delta_;
+                }
+
+                ++framesCount;
+                if (framesCount == 60) //((tPublish + tProcess) >= 1000)
+                {
+                    std::cout << "Amount of events in array: " << eventCount << std::endl;
+                    framesCount = 0;
+                    eventCount = 0;
+
+                    //                std::cout << " Average times: \n process - \t" << tProcess/framesCount
+                    //                          << "ms, \n publish - \t"           << tPublish/framesCount
+                    //                          << "ms, \n total - \t"            << (tPublish+tProcess)/framesCount
+                    //                          << "ms" << std::endl;
+                    tProcess = 0;
+                    tPublish = 0;
+                    framesCount = 0;
+
+                }
+            }
+            //            event_array_pub_.publish(event_array_msg);
+            //            event_array_msg->events.clear();
 
             t1.stop();
             tPublish += t1.getElapsedTimeInMilliSec();
 
-            ++framesCount;
-            if (framesCount == 60) //((tPublish + tProcess) >= 1000)
-            {
-                std::cout << "Amount of events in array: " << eventCount << std::endl;
-                framesCount = 0;
-                eventCount = 0;
 
-//                std::cout << " Average times: \n process - \t" << tProcess/framesCount
-//                          << "ms, \n publish - \t"           << tPublish/framesCount
-//                          << "ms, \n total - \t"            << (tPublish+tProcess)/framesCount
-//                          << "ms" << std::endl;
-                tProcess = 0;
-                tPublish = 0;
-                framesCount = 0;
-
-            }
 
 //            std::cout << "ros::spinOnce now" << std::endl;
             ros::spinOnce();

@@ -91,6 +91,8 @@ private:
 
   unsigned dvsThresh;
 
+  unsigned streamingRate;
+
   shared_mem_emul *dataShrd;
 
   Timer t1;
