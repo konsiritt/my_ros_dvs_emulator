@@ -3,7 +3,7 @@
   <name>ros_dvs_renderer</name>
   <version>0.0.0</version>
   <description>The ros_dvs_renderer package</description>
-  <maintainer email="mueggler@ifi.uzh.ch">Elias Mueggler</maintainer>
+  <maintainer email="ritt@mytum.de">Konstantin Ritt</maintainer>
   <license>GNU GPL</license>
 
   <buildtool_depend>catkin</buildtool_depend>
