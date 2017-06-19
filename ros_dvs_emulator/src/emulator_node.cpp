@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
 
     {
         bip::scoped_lock<bip::interprocess_mutex> lock(dataShrdMain->mutex);
-        ROS_INFO ( "testing shared mem access in emulator: aIsNew: %i timeA: %0.2f imageA[12]: %i", dataShrdMain->aIsNew, dataShrdMain->timeA, (int) dataShrdMain->imageA[12] );
+        ROS_INFO ( "testing shared mem access in emulator: timeNew: %0.2f imageNew[12]: %i", dataShrdMain->timeNew, (int) dataShrdMain->imageNew[12] );
     }
 
     std::cout << "Start the RosDvsEmulator object" << std::endl;
