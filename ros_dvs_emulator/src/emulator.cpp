@@ -30,7 +30,8 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private)
     tProcess(0),
     tPublish(0),
     framesCount(0),
-    eventCount(0)
+    eventCount(0),
+    linLogLim(lin_log_lim)
 {
     dataShrd = dataShrdMain;
 
@@ -55,7 +56,8 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private,
     tProcess(0),
     tPublish(0),
     framesCount(0),
-    eventCount(0)
+    eventCount(0),
+    linLogLim(lin_log_lim)
 {
 //    ROS_INFO( "testing shared mem access in emulator: aIsNew: %i timeA: %0.2f imageA[12]: %i", dataShrd->aIsNew, dataShrd->timeA, (int) dataShrd->imageA[12] );
 
@@ -101,7 +103,7 @@ void RosDvsEmulator::readout()
 
             t1.start();
 
-            int temp_lum = 0;
+            int tempLum = 0;
             int sizePic = event_array_msg->height*event_array_msg->width;
             // compute luminance difference for each pixel
             // to do that: lock mutex while reading
@@ -123,29 +125,37 @@ void RosDvsEmulator::readout()
                 for (int ii=0; ii<sizePic; ++ii)
                 {
                     // currently not rounding correctly, just to get visualization through ROS
-                    temp_lum = (int) (0.33*(dataShrd->imageNew[4*ii] + dataShrd->imageNew[4*ii+1] + dataShrd->imageNew[4*ii+2]
-                            - dataShrd->imageRef[4*ii] - dataShrd->imageRef[4*ii+1] - dataShrd->imageRef[4*ii+2]));
-                    // 2DO: correct handling of luminance values...., proper rounding etc.
+                    tempLum = linlog(0.33*(dataShrd->imageNew[4*ii] + dataShrd->imageNew[4*ii+1] + dataShrd->imageNew[4*ii+2]))
+                            - dataShrd->imageRef[ii];
 
+                    // determine event polarity
                     bool positiveVal = false;
-                    if (temp_lum > 0)
+                    if (tempLum > 0)
                     {
                         positiveVal = true;
                     }
-                    temp_lum = abs(temp_lum);
+                    tempLum = abs(tempLum);
 
-                    if (temp_lum>dvsThresh)
+                    if (tempLum>dvsThresh)
                     {
+                        // create ROS event message
                         dvs_msgs::Event e;
                         e.y = event_array_msg->height - (int) ii/event_array_msg->width;
                         e.x = ii%event_array_msg->width;
                         e.ts = ros::Time(dataShrd->timeNew - (dataShrd->timeNew - dataShrd->timeRef)/2);
                         e.polarity = positiveVal;
 
-                        dataShrd->imageRef[4*ii] = dataShrd->imageNew[4*ii];
-                        dataShrd->imageRef[4*ii+1] = dataShrd->imageNew[4*ii+1];
-                        dataShrd->imageRef[4*ii+2] = dataShrd->imageNew[4*ii+2];
+                        // update reference frame according to polarity of event
+                        if (positiveVal)
+                        {
+                            dataShrd->imageRef[ii] = dataShrd->imageRef[ii] + tempLum;
+                        }
+                        else
+                        {
+                            dataShrd->imageRef[ii] = dataShrd->imageRef[ii] - tempLum;
+                        }
 
+                        // add event message to message array
                         event_array_msg->events.push_back(e);
                     }
                 }
@@ -155,9 +165,6 @@ void RosDvsEmulator::readout()
             t1.stop();
             tProcess += t1.getElapsedTimeInMilliSec();
             t1.start();
-
-            //            eventCount += event_array_msg->events.size();
-
 
             // throttle event messages
             if (boost::posix_time::microsec_clock::local_time() > next_send_time || streamingRate == 0)

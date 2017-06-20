@@ -54,7 +54,7 @@ struct shared_mem_emul
     double timeNew;
     double timeRef;
     unsigned char imageNew[image_width*image_height*4];
-    unsigned char imageRef[image_width*image_height*4];
+    double imageRef[image_width*image_height];
 
     //boolean updated when new frame was written
     bool frameUpdated;
@@ -73,6 +73,16 @@ public:
     RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private);
   RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private, shared_mem_emul * dataShrd_);
   ~RosDvsEmulator();
+
+  inline double linlog(double arg)
+  {
+      if (arg>linLogLim)
+      {
+          return log(arg);
+      }
+      else
+          return log(linLogLim)/linLogLim*arg;
+  }
 
 private:
 
@@ -97,8 +107,9 @@ private:
   double tProcess;
   double tPublish;
   unsigned framesCount;
-
   unsigned eventCount;
+
+  double linLogLim;
 
 
 };
