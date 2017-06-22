@@ -31,6 +31,7 @@ int main(int argc, char* argv[])
   ros::ServiceServer serviceReset = nh.advertiseService("reset_measurements", &ros_dvs_benchmark::BenchSubscr::reset_measurements, &benchSubscriber);
   ros::ServiceServer serviceDuration = nh.advertiseService("get_duration", &ros_dvs_benchmark::BenchSubscr::get_duration, &benchSubscriber);
   ros::ServiceServer serviceFrequency = nh.advertiseService("get_frequency", &ros_dvs_benchmark::BenchSubscr::get_frequency, &benchSubscriber);
+  ros::ServiceServer serviceLog = nh.advertiseService("log_results", &ros_dvs_benchmark::BenchSubscr::log_results, &benchSubscriber);
 
   ros::spin();
 

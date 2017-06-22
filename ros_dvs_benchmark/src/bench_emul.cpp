@@ -60,16 +60,20 @@ void BenchEmul::runBenchmark ()
     ros::ServiceClient clientReset = nh_.serviceClient<ros_dvs_service::GetTime>("reset_measurements");
     ros::ServiceClient clientDuration = nh_.serviceClient<ros_dvs_service::GetTime>("get_duration");
     ros::ServiceClient clientFrequency = nh_.serviceClient<ros_dvs_service::GetTime>("get_frequency");
+    ros::ServiceClient clientLog = nh_.serviceClient<ros_dvs_service::GetTime>("log_results");
     // create service classes to perform service calls with
     ros_dvs_service::GetTime srvReset;
     ros_dvs_service::GetTime srvDuration;
     ros_dvs_service::GetTime srvFrequency;
+    ros_dvs_service::GetTime srvLog;
 
-    for (int packSize = 10; packSize < 40150; packSize+=5000)
+    for (int packSize = 10; packSize < 75050; packSize+=5000)
     {
         ros::Rate loopRate(pubFreq);
 
         std::cout << "------ publishing packets with " << packSize << " events ------" << std::endl;
+
+        // publish for multiple #iterations to obtain good average
         for (unsigned ii=0; ii<iterations; ++ii)
         {
             publishPacket(packSize);
@@ -88,6 +92,7 @@ void BenchEmul::runBenchmark ()
             std::cout << "current subscriber frequency too low" << std::endl;
         }
         clientDuration.call(srvDuration);
+        clientLog.call(srvLog);
         clientReset.call(srvReset);
     }
     ros::shutdown();
