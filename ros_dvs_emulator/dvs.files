@@ -1,5 +1,0 @@
-include/ros_dvs_emulator/emulator.h
-include/ros_dvs_emulator/emulator_nodelet.h
-src/emulator.cpp
-src/emulator_node.cpp
-src/emulator_nodelet.cpp
