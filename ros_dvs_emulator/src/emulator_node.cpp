@@ -21,8 +21,6 @@
 
 #include <ros/ros.h>
 
-#define image_width 320 //640
-#define image_height 240 //480
 #include "ros_dvs_emulator/emulator.h"
 
 namespace bip = boost::interprocess;
