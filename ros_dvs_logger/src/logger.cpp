@@ -22,7 +22,8 @@ namespace ros_dvs_logger {
 
 EventLogger::EventLogger(ros::NodeHandle & nh, ros::NodeHandle nh_private) :
     nh_(nh),
-    outputDir("/home/rittk/devel/catkin_torcs_ros/logs/output/ros_dvs_benchmark"), //2DO: make adaptable
+    counterReceived(0),
+    outputDir("/home/rittk/devel/catkin_torcs_ros/logs/output/aedat"), //2DO: make adaptable
     meanFrequency(0),
     stdDevFrequency(0),
     meanDuration(0),
@@ -37,7 +38,7 @@ EventLogger::EventLogger(ros::NodeHandle & nh, ros::NodeHandle nh_private) :
     sizeSent.reserve(1000);
 
     // setup subscribers and publishers
-    event_sub_ = nh_.subscribe("events", 1, &EventLogger::eventsCallback, this,
+    event_sub_ = nh_.subscribe("events", 100, &EventLogger::eventsCallback, this,
                                ros::TransportHints().reliable().tcpNoDelay(true)); //.unreliable()
     // unreliable(): UDP
     // reliable().tcpNoDelay(true): TCP without Nagle's algorithm
@@ -151,8 +152,16 @@ bool EventLogger::log_results(ros_dvs_service::GetTime::Request &req,
     return true;
 }
 
-void EventLogger::eventsCallback(const dvs_msgs::EventArray::ConstPtr& msg)
+void EventLogger::eventsCallback(const ros_dvs_msgs::EventArray::ConstPtr& msg)
 {
+    if (counterReceived != msg->counter)
+    {
+        std::cerr << msg->counter-counterReceived << " event package(s) dropped!" << std::endl;
+        //2DO: error handling
+        counterReceived = msg->counter;
+    }
+    counterReceived++;
+
     if (msg->events.size() == 0)
     {
         return;

@@ -10,8 +10,8 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 // messages
-#include <dvs_msgs/Event.h>
-#include <dvs_msgs/EventArray.h>
+#include <ros_dvs_msgs/Event.h>
+#include <ros_dvs_msgs/EventArray.h>
 #include <std_msgs/Empty.h>
 
 // dvs configuration file
@@ -33,6 +33,8 @@ private:
     void runBenchmark ();
 
     void publishPacket(unsigned packetSize);
+
+    uint64_t countPackages;
 
     ros::NodeHandle nh_;
     ros::Publisher event_array_pub_;

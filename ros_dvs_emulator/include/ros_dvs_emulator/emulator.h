@@ -30,8 +30,8 @@
 #include <boost/interprocess/sync/interprocess_condition.hpp>
 
 // messages
-#include <dvs_msgs/Event.h>
-#include <dvs_msgs/EventArray.h>
+#include <ros_dvs_msgs/Event.h>
+#include <ros_dvs_msgs/EventArray.h>
 #include <std_msgs/Empty.h>
 
 // execution time measurement
@@ -93,6 +93,8 @@ public:
 private:
 
   void readout();
+
+  uint64_t countPackages;
 
   ros::NodeHandle nh_;
   ros::Publisher event_array_pub_;

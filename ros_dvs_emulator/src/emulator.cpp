@@ -24,6 +24,7 @@ extern  shared_mem_emul * dataShrdMain;
 namespace ros_dvs_emulator {
 
 RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private) :
+    countPackages(0),
     nh_(nh),
     dvsThresh(dvs_threshold), //2DO: include in config file
     streamingRate(100),
@@ -40,7 +41,7 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private)
     std::string ns = ros::this_node::getNamespace();
     if (ns == "/")
         ns = "/dvs";
-    event_array_pub_ = nh_.advertise<dvs_msgs::EventArray>(ns + "/events", 1);
+    event_array_pub_ = nh_.advertise<ros_dvs_msgs::EventArray>(ns + "/events", 1);
 
     for (uint16_t ii = 0; ii<256; ++ii)
     {
@@ -55,6 +56,7 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private)
 }
 
 RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private, shared_mem_emul * dataShrd_) :
+    countPackages(0),
     nh_(nh),
     dvsThresh(dvs_threshold), //2DO: include in config file
     streamingRate(200),
@@ -72,7 +74,7 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private,
     std::string ns = ros::this_node::getNamespace();
     if (ns == "/")
         ns = "/dvs";
-    event_array_pub_ = nh_.advertise<dvs_msgs::EventArray>(ns + "/events", 1);
+    event_array_pub_ = nh_.advertise<ros_dvs_msgs::EventArray>(ns + "/events", 1);
 
     for (uint16_t ii = 0; ii<256; ++ii)
     {
@@ -115,7 +117,7 @@ double RosDvsEmulator::linlog(uint16_t arg)
 
 void RosDvsEmulator::readout()
 {
-    dvs_msgs::EventArrayPtr event_array_msg(new dvs_msgs::EventArray());
+    ros_dvs_msgs::EventArrayPtr event_array_msg(new ros_dvs_msgs::EventArray());
     event_array_msg->height = image_height; //2DO: get dynamically
     event_array_msg->width = image_width;
 
@@ -164,7 +166,7 @@ void RosDvsEmulator::readout()
                     if (tempLum>dvsThresh)
                     {
                         // create ROS event message
-                        dvs_msgs::Event e;
+                        ros_dvs_msgs::Event e;
                         e.y = (int) ii/event_array_msg->width;
                         e.x = ii%event_array_msg->width;
                         e.ts = ros::Time(dataShrd->timeNew - (dataShrd->timeNew - dataShrd->timeRef)/2);
@@ -196,6 +198,7 @@ void RosDvsEmulator::readout()
             {
                 eventCount += event_array_msg->events.size();
 
+                event_array_msg->counter = countPackages++;
                 event_array_pub_.publish(event_array_msg);
                 event_array_msg->events.clear();
                 if (streamingRate > 0)

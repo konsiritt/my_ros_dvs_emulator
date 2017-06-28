@@ -23,6 +23,7 @@ namespace ros_dvs_benchmark {
 
 BenchSubscr::BenchSubscr(ros::NodeHandle & nh, ros::NodeHandle nh_private) :
     nh_(nh),
+    counterReceived(0),
     outputDir("/home/rittk/devel/catkin_torcs_ros/logs/output/ros_dvs_benchmark"), //2DO: make adaptable
     meanFrequency(0),
     stdDevFrequency(0),
@@ -139,8 +140,16 @@ bool BenchSubscr::log_results(ros_dvs_service::GetTime::Request &req,
     return true;
 }
 
-void BenchSubscr::eventsCallback(const dvs_msgs::EventArray::ConstPtr& msg)
+void BenchSubscr::eventsCallback(const ros_dvs_msgs::EventArray::ConstPtr& msg)
 {
+    if (counterReceived != msg->counter)
+    {
+        std::cerr << msg->counter-counterReceived << " event package(s) dropped!" << std::endl;
+        //2DO: error handling
+        counterReceived = msg->counter;
+    }
+    counterReceived++;
+
     timestampNow.push_back(ros::Time::now());
     timestampSent.push_back(msg->events.back().ts);
     sizeSent.push_back(msg->events.size());

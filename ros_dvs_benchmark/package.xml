@@ -11,7 +11,7 @@
 
   <depend>roscpp</depend>
   <depend>ros_dvs_service</depend>
-  <depend>dvs_msgs</depend>
+  <depend>ros_dvs_msgs</depend>
   <depend>std_msgs</depend>
   <depend>nodelet</depend>
 

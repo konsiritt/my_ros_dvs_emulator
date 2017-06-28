@@ -10,7 +10,7 @@
   <buildtool_depend>catkin_simple</buildtool_depend>
 
   <depend>roscpp</depend>
-  <depend>dvs_msgs</depend>
+  <depend>ros_dvs_msgs</depend>
   <depend>std_msgs</depend>
   <depend>nodelet</depend>
 

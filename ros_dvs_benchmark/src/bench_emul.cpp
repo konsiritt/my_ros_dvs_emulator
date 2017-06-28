@@ -24,6 +24,7 @@
 namespace ros_dvs_benchmark {
 
 BenchEmul::BenchEmul(ros::NodeHandle & nh, ros::NodeHandle nh_private) :
+    countPackages(0),
     nh_(nh),
     iterations(1000),
     pubFreq(200)
@@ -33,7 +34,7 @@ BenchEmul::BenchEmul(ros::NodeHandle & nh, ros::NodeHandle nh_private) :
     std::string ns = ros::this_node::getNamespace();
     if (ns == "/")
         ns = "/dvs";
-    event_array_pub_ = nh_.advertise<dvs_msgs::EventArray>(ns + "/events", 1);
+    event_array_pub_ = nh_.advertise<ros_dvs_msgs::EventArray>(ns + "/events", 1);
 
     // spawn threads
     running_ = true;
@@ -105,13 +106,14 @@ void BenchEmul::publishPacket(unsigned packetSize)
     std::uniform_int_distribution<> distrW(0, image_width-1); // define the range
     std::uniform_int_distribution<> distrH(0, image_height-1); // define the range
 
-    dvs_msgs::EventArrayPtr event_array_msg(new dvs_msgs::EventArray());
+    ros_dvs_msgs::EventArrayPtr event_array_msg(new ros_dvs_msgs::EventArray());
     event_array_msg->height = image_height; //2DO: get dynamically
     event_array_msg->width = image_width;
+    event_array_msg->counter = countPackages++;
 
     for (unsigned ii = 0; ii< packetSize; ++ii)
     {
-        dvs_msgs::Event e;
+        ros_dvs_msgs::Event e;
         e.y = distrW(eng);
         e.x = distrH(eng);
         e.ts = ros::Time::now();

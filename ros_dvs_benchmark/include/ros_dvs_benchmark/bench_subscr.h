@@ -3,8 +3,8 @@
 
 #include <ros/ros.h>
 
-#include <dvs_msgs/Event.h>
-#include <dvs_msgs/EventArray.h>
+#include <ros_dvs_msgs/Event.h>
+#include <ros_dvs_msgs/EventArray.h>
 
 // store measurements
 #include <vector>
@@ -47,11 +47,13 @@ private:
   //****************************************************************
   ros::NodeHandle nh_;
 
+  uint64_t counterReceived;
+
   //!
   //! \brief eventsCallback is called whenever an event packet is received
   //! \param msg is a pointer to the received message
   //!
-  void eventsCallback(const dvs_msgs::EventArray::ConstPtr& msg);
+  void eventsCallback(const ros_dvs_msgs::EventArray::ConstPtr& msg);
 
   ros::Subscriber event_sub_;
 
