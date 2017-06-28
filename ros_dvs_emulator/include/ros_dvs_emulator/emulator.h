@@ -40,6 +40,9 @@
 // dvs configuration file
 #include "ros_dvs_emulator/config_dvs.h"
 
+// plot/log data
+#include <fstream>      // std::ofstream
+
 struct shared_mem_emul
 {
     shared_mem_emul() :
@@ -84,6 +87,9 @@ public:
           return log(linLogLim)/linLogLim*arg;
   }
 
+  double linlog(uint16_t arg);
+
+
 private:
 
   void readout();
@@ -111,6 +117,16 @@ private:
 
   double linLogLim;
 
+  double lookupLinLog[256];
+
+  //****************************************************************
+  ///! Plotting parameters
+  //****************************************************************
+  void logLookupTable ();
+  //! directory for data logging
+  std::string outputDir;
+  //! output stream object for benchmark results logging
+  std::ofstream linLogPlot;
 
 };
 

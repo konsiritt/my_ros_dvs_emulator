@@ -31,7 +31,8 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private)
     tPublish(0),
     framesCount(0),
     eventCount(0),
-    linLogLim(lin_log_lim)
+    linLogLim(lin_log_lim),
+    outputDir("/home/rittk/devel/catkin_torcs_ros/logs/output/ros_dvs_emulator") //2DO: make adaptable
 {
     dataShrd = dataShrdMain;
 
@@ -41,8 +42,15 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private)
         ns = "/dvs";
     event_array_pub_ = nh_.advertise<dvs_msgs::EventArray>(ns + "/events", 1);
 
+    for (uint16_t ii = 0; ii<256; ++ii)
+    {
+        lookupLinLog[ii] = linlog((double) ii);
+    }
+    logLookupTable();
+
     // spawn threads
     running_ = true;
+    std::cout << "Now spawning threads" << std::endl;
     readout_thread_ = boost::shared_ptr< boost::thread >(new boost::thread(boost::bind(&RosDvsEmulator::readout, this)));
 }
 
@@ -57,19 +65,24 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private,
     tPublish(0),
     framesCount(0),
     eventCount(0),
-    linLogLim(lin_log_lim)
+    linLogLim(lin_log_lim),
+    outputDir("/home/rittk/devel/catkin_torcs_ros/logs/output/ros_dvs_emulator") //2DO: make adaptable
 {
-//    ROS_INFO( "testing shared mem access in emulator: aIsNew: %i timeA: %0.2f imageA[12]: %i", dataShrd->aIsNew, dataShrd->timeA, (int) dataShrd->imageA[12] );
-
     // set namespace
     std::string ns = ros::this_node::getNamespace();
     if (ns == "/")
         ns = "/dvs";
     event_array_pub_ = nh_.advertise<dvs_msgs::EventArray>(ns + "/events", 1);
 
-    std::cout << "Spawn threads" << std::endl;
+    for (uint16_t ii = 0; ii<256; ++ii)
+    {
+        lookupLinLog[ii] = linlog((double) ii);
+    }
+    logLookupTable();
+
     // spawn threads
     running_ = true;
+    std::cout << "Now spawning threads" << std::endl;
     readout_thread_ = boost::shared_ptr< boost::thread >(new boost::thread(boost::bind(&RosDvsEmulator::readout, this)));
 }
 
@@ -85,6 +98,19 @@ RosDvsEmulator::~RosDvsEmulator()
 
 //    //Erase shared memory 2DO: does it make sense to remove in both classes?
 //    bip::shared_memory_object::remove("shared_memory");
+}
+
+double RosDvsEmulator::linlog(uint16_t arg)
+{
+    if (arg < 256)
+    {
+        return lookupLinLog[arg];
+    }
+    else
+    {
+        std::cerr << "wrong illuminance value computed" << std::endl;
+        return 0;
+    }
 }
 
 void RosDvsEmulator::readout()
@@ -123,9 +149,8 @@ void RosDvsEmulator::readout()
                 t1.start();
 
                 for (int ii=0; ii<sizePic; ++ii)
-                {
-                    // currently not rounding correctly, just to get visualization through ROS
-                    tempLum = linlog(0.33*(dataShrd->imageNew[4*ii] + dataShrd->imageNew[4*ii+1] + dataShrd->imageNew[4*ii+2]))
+                {                    
+                    tempLum = linlog((uint16_t) (1.0/3.0*(dataShrd->imageNew[4*ii] + dataShrd->imageNew[4*ii+1] + dataShrd->imageNew[4*ii+2])) )
                             - dataShrd->imageRef[ii];
 
                     // determine event polarity
@@ -214,6 +239,30 @@ void RosDvsEmulator::readout()
             std::cout << "thread interrupted" << std::endl;
             return;
         }
+    }
+}
+
+void RosDvsEmulator::logLookupTable()
+{
+    if( !linLogPlot.is_open() )
+    {
+        if (!linLogPlot)
+        {
+            std::cerr << "something went wrong when opening the logging file" << std::endl;
+            return;
+        }
+        std::cout << "plotting results of linlog mapping to " << (outputDir +"/linlog.out").c_str() << std::endl;
+        linLogPlot.open((outputDir +"/linlog.out").c_str(),std::fstream::out); //std::ios::app);
+    }
+    else
+    {
+        std::cerr <<"Could not open file!\n" << std::endl;
+        return;
+    }
+
+    for (uint16_t ii=0; ii<256; ++ii)
+    {
+        linLogPlot << ii << " " << linlog((double) ii) << std::endl;
     }
 }
 
