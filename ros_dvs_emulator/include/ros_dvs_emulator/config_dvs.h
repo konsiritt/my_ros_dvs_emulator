@@ -3,8 +3,8 @@
 
 // define dvs variables here
 
-#define image_width 320 //640 //
-#define image_height 240 //480 //
+#define image_width 640 //320 //
+#define image_height 480 //240 //
 
 #define pbo_count 2
 

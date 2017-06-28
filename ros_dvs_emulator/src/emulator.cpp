@@ -165,7 +165,7 @@ void RosDvsEmulator::readout()
                     {
                         // create ROS event message
                         dvs_msgs::Event e;
-                        e.y = event_array_msg->height - (int) ii/event_array_msg->width;
+                        e.y = (int) ii/event_array_msg->width;
                         e.x = ii%event_array_msg->width;
                         e.ts = ros::Time(dataShrd->timeNew - (dataShrd->timeNew - dataShrd->timeRef)/2);
                         e.polarity = positiveVal;
@@ -212,7 +212,7 @@ void RosDvsEmulator::readout()
                               << "ms, \n wait - \t"             << tWait/framesCount
                               << "ms, \n process - \t"          << tProcess/framesCount
                               << "ms, \n publish - \t"           << tPublish/framesCount
-                              << "ms, \n total - \t"            << (tPublish+tProcess)/framesCount
+                              << "ms, \n total - \t"            << (tPublish+tProcess+tWait+tMutex)/framesCount
                               << "ms" << std::endl;
                     tMutex = 0;
                     tWait = 0;
