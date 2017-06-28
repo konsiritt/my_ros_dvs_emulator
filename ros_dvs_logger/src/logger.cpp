@@ -44,6 +44,17 @@ EventLogger::EventLogger(ros::NodeHandle & nh, ros::NodeHandle nh_private) :
 
     initPlotting();
     initLogging();
+
+//    int32_t onPolarity = 2048; // bit at Position 11 is 1 -> 2^11 = 2048
+//    int32_t xScreen = 239 << 12;
+//    int32_t yScreen = 240 << 22;
+//    int32_t writeDataLittle = xScreen | yScreen;
+//    writeDataLittle = writeDataLittle | onPolarity;
+
+//    printf("First 32 bit hex: %llX\n", writeDataLittle);
+//    printf("First 32 bit integer: %llu\n", writeDataLittle);
+//    printf("First 32 bit hex swapped: %llX\n", __builtin_bswap32(writeDataLittle));
+//    printf("First 32 bit integer swapped: %llu\n", __builtin_bswap32(writeDataLittle));
 }
 
 EventLogger::~EventLogger()
@@ -146,7 +157,6 @@ void EventLogger::eventsCallback(const dvs_msgs::EventArray::ConstPtr& msg)
     {
         return;
     }
-//    std::cout << "package of size " << msg->events.size() << " received" << std::endl;
 
     timestampNow.push_back(ros::Time::now());
     timestampSent.push_back(msg->events.back().ts);
@@ -155,7 +165,7 @@ void EventLogger::eventsCallback(const dvs_msgs::EventArray::ConstPtr& msg)
     int32_t writeDataLittle = 0;
     int32_t xScreen = 0;
     int32_t yScreen = 0;
-    int32_t onPolarity = 4096; // bit at Position 11 is a 1 -> 2^12 = 4096
+    int32_t onPolarity = 2048; // bit at Position 11 is 1 -> 2^12 = 4096
 
     int32_t timeStamp = 0;
 
@@ -165,8 +175,8 @@ void EventLogger::eventsCallback(const dvs_msgs::EventArray::ConstPtr& msg)
     // perform conversion to 32 bit signed integers for each event received via ROS
     for (int ii = 0; ii < msg->events.size(); ++ii)
     {
-        xScreen = (imageWidth - msg->events[ii].x) << 12;
-        yScreen = (imageHeight - msg->events[ii].y) << 22;
+        xScreen = (imageWidth - 1 - msg->events[ii].x) << 12;
+        yScreen = msg->events[ii].y << 22;
 
         writeDataLittle = xScreen | yScreen;
 
@@ -183,22 +193,81 @@ void EventLogger::eventsCallback(const dvs_msgs::EventArray::ConstPtr& msg)
         }
 
         // write ints to file
-        logAer(writeDataLittle);        
+        logAer(writeDataLittle);
         logAer(timeStamp);
 
         eventCounter++;
     }
-    if (eventCounter > 1e6)
+
+    // perform test output
+//    if (eventCounter > 1e6)
+//    {
+//        int lastElement = msg->events.size()-1;
+//        printf("First 32 bit integer: %llX\n", writeDataLittle);
+//        printf("First 32 bit integer: %llu\n", writeDataLittle);
+//        printf("Timestamp 32 bit integer: %llX\n", timeStamp);
+//        printf("Timestamp 32 bit integer: %llu\n", timeStamp);
+//        printf("representing x: %llu y: %llu polarity: %d time: %llu[s] %llu[ns] \n", msg->events[lastElement].x,
+//               msg->events[lastElement].y, msg->events[lastElement].polarity, msg->events[lastElement].ts.sec, msg->events[lastElement].ts.nsec);
+//        eventCounter = 0;
+//    }
+}
+
+void EventLogger::eventsBinaryTest(int32_t screenWidth, int32_t screenHeight, int32_t timeStamp)
+{
+    int32_t writeDataLittle = 0;
+    int32_t xScreen = 0;
+    int32_t yScreen = 0;
+
+    int32_t onPolarity = 2048; // bit at Position 11 is 1 -> 2^12 = 4096
+
+    for (int32_t ii=0; ii<screenHeight; ++ii)
     {
-        int lastElement = msg->events.size()-1;
-        printf("First 32 bit integer: %llX\n", writeDataLittle);
-        printf("First 32 bit integer: %llu\n", writeDataLittle);
-        printf("Timestamp 32 bit integer: %llX\n", timeStamp);
-        printf("Timestamp 32 bit integer: %llu\n", timeStamp);
-        printf("representing x: %llu y: %llu polarity: %d time: %llu[s] %llu[ns] \n", msg->events[lastElement].x,
-               msg->events[lastElement].y, msg->events[lastElement].polarity, msg->events[lastElement].ts.sec, msg->events[lastElement].ts.nsec);
-        eventCounter = 0;
+        if (ii==0 || ii==1 || ii==2 || ii == screenHeight/2 || ii==screenHeight/4)
+        {
+            for (int32_t jj=0; jj<screenWidth; ++jj)
+            {
+                xScreen = jj << 12;
+                yScreen = ii << 22;
+                writeDataLittle = xScreen | yScreen;
+                writeDataLittle = writeDataLittle | onPolarity;
+                // write ints to file
+                logAer(writeDataLittle);
+                logAer(timeStamp);
+            }
+        }
+        else if (ii==screenHeight-1 || ii==screenHeight-2 || ii==screenHeight-3)
+        {
+            for (int32_t jj=0; jj<screenWidth; ++jj)
+            {
+                xScreen = jj << 12;
+                yScreen = ii << 22;
+                writeDataLittle = xScreen | yScreen;
+                writeDataLittle = writeDataLittle | onPolarity;
+                // write ints to file
+                logAer(writeDataLittle);
+                logAer(timeStamp);
+            }
+        }
+        else
+        {
+            xScreen = 0 << 12;
+            yScreen = ii << 22;
+            writeDataLittle = xScreen | yScreen;
+            // write ints to file
+            logAer(writeDataLittle);
+            logAer(timeStamp);
+
+            xScreen = (screenWidth-1) << 12;
+            yScreen = ii << 22;
+            writeDataLittle = xScreen | yScreen;
+            writeDataLittle = writeDataLittle | onPolarity;
+            // write ints to file
+            logAer(writeDataLittle);
+            logAer(timeStamp);
+        }
     }
+
 }
 
 int EventLogger::initLogging()
@@ -221,9 +290,7 @@ int EventLogger::initLogging()
     eventsLog.write( (const char *) "# This is a raw AE data file - do not edit\r\n", 44);
     eventsLog.write( (const char *) "# Data format is int32 address, int32 timestamp (8 bytes total), repeated for each event\r\n", 90);
     eventsLog.write( (const char *) "# Timestamps tick is 1 us\r\n", 27);
-    //        time_t now = time(0);
-    //        char* currentTime = ctime(&now);
-    //        eventsLog.write( (const char *) "# created " + currentTime + "\r\n", 12 + strlen(currentTime));
+
     // First prepend the time.
     time_t currentTimeEpoch = time(NULL);
     // From localtime_r() man-page: "According to POSIX.1-2004, localtime()
@@ -248,13 +315,7 @@ return 1;
 
 int EventLogger::logAer(const int32_t writeDataLittle)
 {
-//    printf("First 32 bit writeDataLittle: %llX\n", writeDataLittle);
-//    printf("First 32 bit writeDataLittle: %llu\n", writeDataLittle);
-    // assume that writeData is 32-bit little endian fixed point number
     int32_t writeDataBig = __builtin_bswap32(writeDataLittle);
-//    printf("First 32 bit writeDataBig: %llX\n", writeDataBig);
-//    printf("First 32 bit writeDataBig: %llu\n", writeDataBig);
-//    printf("Size of writeDataBig: %llu\n", sizeof(writeDataBig));
     eventsLog.write((char *) (&writeDataBig), 4);
     return 1;
 }

@@ -79,6 +79,8 @@ private:
   //!
   void eventsCallback(const dvs_msgs::EventArray::ConstPtr& msg);
 
+  void eventsBinaryTest(int32_t screenWidth, int32_t screenHeight, int32_t timeStamp);
+
   ros::Subscriber event_sub_;
 
   //****************************************************************
