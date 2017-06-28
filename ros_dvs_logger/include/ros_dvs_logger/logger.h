@@ -28,7 +28,9 @@
 #include <ctime>
 
 // plot/log data
+#include <cstdint>      // fixed width integer types
 #include <fstream>      // std::ofstream
+#include <iostream>
 #define AEDAT3_FILE_VERSION 2.0
 
 // perform big endian small endian conversions:
@@ -36,6 +38,8 @@
 
 // service file
 #include "ros_dvs_service/GetTime.h"
+
+#include <cstdio> // printf
 
 namespace ros_dvs_logger
 {
@@ -104,8 +108,10 @@ private:
   ///! Logging parameters -> save events in AER-DAT file format
   //****************************************************************
   int initLogging();
-  int logAer();
+  int logAer(const int32_t writeDataLittle);
   int closeLogging();
+
+  uint64_t eventCounter;
 
   //! directory for data logging
   std::string outputDir;

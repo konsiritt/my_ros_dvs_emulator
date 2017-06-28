@@ -1,7 +1,6 @@
 <launch>
-	<!-- Start Subscriber -->
-	<node name="subscriber" pkg="ros_dvs_logger" type="ros_dvs_logger" 
-		required="true"
+	<!-- Start Logger -->
+	<node name="logger" pkg="ros_dvs_logger" type="ros_dvs_logger" 
 		output="screen">
 	<remap from="events" to="/dvs/events" />
 	</node>
