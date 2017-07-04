@@ -27,8 +27,11 @@ namespace ros_dvs_emulator {
 RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private) :
     nh_(nh),
     linLogLim(lin_log_lim),
-    dvsThresh(dvs_threshold), //2DO: include in config file
-    streamingRate(100),
+    dvsThresh(dvs_threshold),
+    streamingRate(ros_streaming_rate),
+#ifdef interp_events
+    interpEvents(interp_timeslots), //2DO: make generic?!
+#endif
     tProcess(0),
     tPublish(0),
     framesCount(0),
@@ -36,19 +39,19 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private)
     countPackages(0),
     outputDir("/home/rittk/devel/catkin_torcs_ros/logs/output/ros_dvs_emulator") //2DO: make adaptable
 {
-    dataShrd = dataShrdMain;
-
     // set namespace
     std::string ns = ros::this_node::getNamespace();
     if (ns == "/")
         ns = "/dvs";
     event_array_pub_ = nh_.advertise<ros_dvs_msgs::EventArray>(ns + "/events", 1);
 
+    dataShrd = dataShrdMain;
+
     for (uint16_t ii = 0; ii<256; ++ii)
     {
         lookupLinLog[ii] = linlog((double) ii);
     }
-    logLookupTable();
+    //    logLookupTable();
 
     // spawn threads
     running_ = true;
@@ -59,8 +62,11 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private)
 RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private, shared_mem_emul * dataShrd_) :    
     nh_(nh),
     linLogLim(lin_log_lim),
-    dvsThresh(dvs_threshold), //2DO: include in config file
-    streamingRate(200),
+    dvsThresh(dvs_threshold),
+    streamingRate(ros_streaming_rate),
+#ifdef interp_events
+    interpEvents(interp_timeslots), //2DO: make generic?!
+#endif
     dataShrd(dataShrd_),
     tMutex(0),
     tWait(0),
@@ -81,7 +87,7 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private,
     {
         lookupLinLog[ii] = linlog((double) ii);
     }
-    logLookupTable();
+    //    logLookupTable();
 
     // spawn threads
     running_ = true;
@@ -129,10 +135,9 @@ void RosDvsEmulator::emulateFrame()
     {
         try
         {
-
             t1.start();
 
-            double tempLum = 0;
+            double pixelLuminance = 0;
             int sizePic = event_array_msg->height*event_array_msg->width;
             // compute luminance difference for each pixel
             // to do that: lock mutex while reading
@@ -151,22 +156,97 @@ void RosDvsEmulator::emulateFrame()
                 tWait += t1.getElapsedTimeInMilliSec();
                 t1.start();
 
+                // iterate through every pixel in the newly obtained frame
                 for (int ii=0; ii<sizePic; ++ii)
                 {
                     // 2DO: currently colorspace equally, luminance obtained from three colors equally (unlike humans)
-                    tempLum = linlog((uint16_t) (1.0/3.0*(dataShrd->imageNew[4*ii] + dataShrd->imageNew[4*ii+1] + dataShrd->imageNew[4*ii+2])) )
+                    pixelLuminance = linlog((uint16_t) (1.0/3.0*(dataShrd->imageNew[4*ii] + dataShrd->imageNew[4*ii+1] + dataShrd->imageNew[4*ii+2])) )
                             - dataShrd->imageRef[ii];
 
                     // determine event polarity
                     bool positiveVal = false;
-                    if (tempLum > 0)
+                    if (pixelLuminance > 0)
                     {
                         positiveVal = true;
                     }
-                    tempLum = abs(tempLum);
+                    pixelLuminance = abs(pixelLuminance);
 
-                    if (tempLum>dvsThresh)
+#ifdef interp_events
+                    int magnitude = 0;
+                    double tempLum = pixelLuminance;
+                    while (tempLum > dvsThresh && magnitude < interp_timeslots)
                     {
+                        magnitude++;
+                        tempLum = tempLum - dvsThresh;
+                    }
+                    if (magnitude !=0)
+                    {
+                        // create ROS event message
+                        ros_dvs_msgs::Event e;
+                        e.y = (int) ii/event_array_msg->width;
+                        e.x = ii%event_array_msg->width;
+                        e.polarity = positiveVal;
+
+                        switch (magnitude) {
+                        case 1:
+                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)/2.0);
+                            interpEvents[2].push_back(e);
+                            break;
+                        case 2:
+                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*1.0/3.0);
+                            interpEvents[1].push_back(e);
+                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*2.0/3.0);
+                            interpEvents[3].push_back(e);
+                            break;
+                        case 3:
+                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*1.0/3.0);
+                            interpEvents[1].push_back(e);
+                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)/2.0);
+                            interpEvents[2].push_back(e);
+                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*2.0/3.0);
+                            interpEvents[3].push_back(e);
+                            break;
+                        case 4:
+                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*1.0/6.0);
+                            interpEvents[0].push_back(e);
+                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*1.0/3.0);
+                            interpEvents[1].push_back(e);
+                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*2.0/3.0);
+                            interpEvents[3].push_back(e);
+                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*5.0/6.0);
+                            interpEvents[4].push_back(e);
+                            break;
+                        case 5:
+                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*1.0/6.0);
+                            interpEvents[0].push_back(e);
+                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*1.0/3.0);
+                            interpEvents[1].push_back(e);
+                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)/2.0);
+                            interpEvents[2].push_back(e);
+                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*2.0/3.0);
+                            interpEvents[3].push_back(e);
+                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*5.0/6.0);
+                            interpEvents[4].push_back(e);
+                            break;
+                        default:
+                            std::cout << "undefined threshold change" << std::endl;
+                        }
+
+                        // update reference frame according to polarity of event
+                        if (positiveVal)
+                        {
+                            dataShrd->imageRef[ii] = dataShrd->imageRef[ii] + pixelLuminance;
+                        }
+                        else
+                        {
+                            dataShrd->imageRef[ii] = dataShrd->imageRef[ii] - pixelLuminance;
+                        }
+
+                    }
+#else
+                    if (pixelLuminance>dvsThresh)
+                    {
+
                         // create ROS event message
                         ros_dvs_msgs::Event e;
                         e.y = (int) ii/event_array_msg->width;
@@ -177,17 +257,33 @@ void RosDvsEmulator::emulateFrame()
                         // update reference frame according to polarity of event
                         if (positiveVal)
                         {
-                            dataShrd->imageRef[ii] = dataShrd->imageRef[ii] + tempLum;
+                            dataShrd->imageRef[ii] = dataShrd->imageRef[ii] + pixelLuminance;
                         }
                         else
                         {
-                            dataShrd->imageRef[ii] = dataShrd->imageRef[ii] - tempLum;
+                            dataShrd->imageRef[ii] = dataShrd->imageRef[ii] - pixelLuminance;
                         }
 
                         // add event message to message array
                         event_array_msg->events.push_back(e);
                     }
+#endif
                 }
+
+#ifdef interp_events
+//                event_array_msg->events.reserve(event_array_msg->events.size() + interpEvents[0].size()
+//                        + interpEvents[1].size() + interpEvents[2].size()
+//                        + interpEvents[3].size() + interpEvents[4].size());
+                for (int ii = 0; ii < interp_timeslots; ++ii)
+                {
+                    if (interpEvents[ii].size()!=0)
+                    {
+                        event_array_msg->events.insert(event_array_msg->events.end(),interpEvents[ii].begin(),
+                                                       interpEvents[ii].end());
+                        interpEvents[ii].clear();
+                    }
+                }
+#endif
                 //flag that the current new frame has been used
                 dataShrd->frameUpdated = false;
             }

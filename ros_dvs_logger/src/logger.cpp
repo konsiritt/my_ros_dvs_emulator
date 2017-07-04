@@ -44,7 +44,7 @@ EventLogger::EventLogger(ros::NodeHandle & nh, ros::NodeHandle nh_private) :
     // unreliable(): UDP
     // reliable().tcpNoDelay(true): TCP without Nagle's algorithm
 
-    initPlotting();
+//    initPlotting();
     initLogging();
 
 //    int32_t onPolarity = 2048; // bit at Position 11 is 1 -> 2^11 = 2048

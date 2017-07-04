@@ -27,10 +27,18 @@
 // configure pixelBuffer and dvsEmulator:
 #define pixel_format GL_BGRA //Fastest option for map from vram to ram
 #define channel_size 4
-#define dvs_threshold 1.0 //0.5 //1.3 // 60 for lin values
+#define dvs_threshold 1.0 //1.3 // 60 for lin values
 
 // define to what value on linear rgb scale the log should be linear
 #define lin_log_lim 20
+
+// define streaming rate of event packages in as ROS topic in [Hz]
+#define ros_streaming_rate 200
+
+// define if interpolation between frames is allowed -> multiple events per pixel per frame
+#define interp_events //#undef interp_events //
+// defines the amount of timeslots for interframe interpolation
+#define interp_timeslots 5
 
 // define frames_float if the color values should be obtained in
 // GL_FLOAT [0,1] format from GPU instead of GL_UNSIGNED_BYTE [0,255]

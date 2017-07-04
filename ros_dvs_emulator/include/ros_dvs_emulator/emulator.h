@@ -140,6 +140,10 @@ private:
     //! rate at which event packages will be published
     //! 2DO: determine preference
     unsigned streamingRate;
+#ifdef interp_events
+    //! vectors for different timeslots for interpolating between frames
+    std::vector<std::vector<ros_dvs_msgs::Event>> interpEvents;
+#endif
     //! struct accessed in shared memory
     shared_mem_emul *dataShrd;
 
