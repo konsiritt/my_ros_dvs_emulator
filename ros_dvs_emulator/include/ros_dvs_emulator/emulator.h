@@ -132,7 +132,7 @@ private:
     //! limit to which value linear scale will be applied
     //! out of range [0,255]
     double linLogLim;
-    //! lookup table for linlog scaling of illuminance
+    //! lookup table for linlog scaling of luminance
     double lookupLinLog[256];
     //! log(illumination) difference threshold,
     //! 2DO: make variable
@@ -164,6 +164,7 @@ private:
     //****************************************************************
     ///! Plotting parameters
     //****************************************************************
+    //! logs the used lookup table of logarithmic luminance intensity
     void logLookupTable ();
     //! directory for data logging
     std::string outputDir;
