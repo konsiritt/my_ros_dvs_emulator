@@ -1,17 +1,18 @@
-// This file is part of DVS-ROS - the RPG DVS ROS Package
+// This file is part of my_ros_dvs_emulator - a DVS emulator implementation
+// Copyright (C) 2017 Konstantin Ritt
 //
-// DVS-ROS is free software: you can redistribute it and/or modify
+// my_ros_dvs_emulator is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// DVS-ROS is distributed in the hope that it will be useful,
+// my_ros_dvs_emulator is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with DVS-ROS.  If not, see <http://www.gnu.org/licenses/>.
+// along with my_ros_dvs_emulator.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "ros_dvs_emulator/emulator.h"
 
@@ -131,7 +132,7 @@ void RosDvsEmulator::readout()
 
             t1.start();
 
-            int tempLum = 0;
+            double tempLum = 0;
             int sizePic = event_array_msg->height*event_array_msg->width;
             // compute luminance difference for each pixel
             // to do that: lock mutex while reading
@@ -152,6 +153,7 @@ void RosDvsEmulator::readout()
 
                 for (int ii=0; ii<sizePic; ++ii)
                 {                    
+                    // 2DO: currently colorspace equally, luminance obtained from three colors equally (unlike humans)
                     tempLum = linlog((uint16_t) (1.0/3.0*(dataShrd->imageNew[4*ii] + dataShrd->imageNew[4*ii+1] + dataShrd->imageNew[4*ii+2])) )
                             - dataShrd->imageRef[ii];
 
