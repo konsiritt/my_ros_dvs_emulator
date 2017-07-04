@@ -42,18 +42,19 @@ public:
   //****************************************************************
   ///! Service functions
   //****************************************************************
+  //! resets measurements
   bool reset_measurements(ros_dvs_service::GetTime::Request &req,
                           ros_dvs_service::GetTime::Response &res);
 
-  // returns average duration of all transmitted packets in [ms]
+  //! returns average duration of all transmitted packets in [ms]
   bool get_duration(ros_dvs_service::GetTime::Request &req,
                     ros_dvs_service::GetTime::Response &res);
 
-  // returns average frequency of all transmitted packets in [Hz]
+  //! returns average frequency of all transmitted packets in [Hz]
   bool get_frequency(ros_dvs_service::GetTime::Request &req,
                     ros_dvs_service::GetTime::Response &res);
 
-  // logs results to a file
+  //! logs results to a file
   bool log_results(ros_dvs_service::GetTime::Request &req,
                     ros_dvs_service::GetTime::Response &res);
 

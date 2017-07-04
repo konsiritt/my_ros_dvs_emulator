@@ -25,15 +25,15 @@ extern  shared_mem_emul * dataShrdMain;
 namespace ros_dvs_emulator {
 
 RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private) :
-    countPackages(0),
     nh_(nh),
+    linLogLim(lin_log_lim),
     dvsThresh(dvs_threshold), //2DO: include in config file
     streamingRate(100),
     tProcess(0),
     tPublish(0),
     framesCount(0),
     eventCount(0),
-    linLogLim(lin_log_lim),
+    countPackages(0),
     outputDir("/home/rittk/devel/catkin_torcs_ros/logs/output/ros_dvs_emulator") //2DO: make adaptable
 {
     dataShrd = dataShrdMain;
@@ -53,12 +53,12 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private)
     // spawn threads
     running_ = true;
     std::cout << "Now spawning threads" << std::endl;
-    readout_thread_ = boost::shared_ptr< boost::thread >(new boost::thread(boost::bind(&RosDvsEmulator::readout, this)));
+    emulate_thread_ = boost::shared_ptr< boost::thread >(new boost::thread(boost::bind(&RosDvsEmulator::emulateFrame, this)));
 }
 
-RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private, shared_mem_emul * dataShrd_) :
-    countPackages(0),
+RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private, shared_mem_emul * dataShrd_) :    
     nh_(nh),
+    linLogLim(lin_log_lim),
     dvsThresh(dvs_threshold), //2DO: include in config file
     streamingRate(200),
     dataShrd(dataShrd_),
@@ -68,7 +68,7 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private,
     tPublish(0),
     framesCount(0),
     eventCount(0),
-    linLogLim(lin_log_lim),
+    countPackages(0),
     outputDir("/home/rittk/devel/catkin_torcs_ros/logs/output/ros_dvs_emulator") //2DO: make adaptable
 {
     // set namespace
@@ -86,7 +86,7 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private,
     // spawn threads
     running_ = true;
     std::cout << "Now spawning threads" << std::endl;
-    readout_thread_ = boost::shared_ptr< boost::thread >(new boost::thread(boost::bind(&RosDvsEmulator::readout, this)));
+    emulate_thread_ = boost::shared_ptr< boost::thread >(new boost::thread(boost::bind(&RosDvsEmulator::emulateFrame, this)));
 }
 
 RosDvsEmulator::~RosDvsEmulator()
@@ -95,12 +95,12 @@ RosDvsEmulator::~RosDvsEmulator()
     {
         ROS_INFO("shutting down threads");
         running_ = false;
-        readout_thread_->join();
+        emulate_thread_->join();
         ROS_INFO("threads stopped");
     }
 
-//    //Erase shared memory 2DO: does it make sense to remove in both classes?
-//    bip::shared_memory_object::remove("shared_memory");
+    //    //Erase shared memory 2DO: does it make sense to remove in both classes?
+    //    bip::shared_memory_object::remove("shared_memory");
 }
 
 double RosDvsEmulator::linlog(uint16_t arg)
@@ -116,7 +116,7 @@ double RosDvsEmulator::linlog(uint16_t arg)
     }
 }
 
-void RosDvsEmulator::readout()
+void RosDvsEmulator::emulateFrame()
 {
     ros_dvs_msgs::EventArrayPtr event_array_msg(new ros_dvs_msgs::EventArray());
     event_array_msg->height = image_height; //2DO: get dynamically
@@ -152,7 +152,7 @@ void RosDvsEmulator::readout()
                 t1.start();
 
                 for (int ii=0; ii<sizePic; ++ii)
-                {                    
+                {
                     // 2DO: currently colorspace equally, luminance obtained from three colors equally (unlike humans)
                     tempLum = linlog((uint16_t) (1.0/3.0*(dataShrd->imageNew[4*ii] + dataShrd->imageNew[4*ii+1] + dataShrd->imageNew[4*ii+2])) )
                             - dataShrd->imageRef[ii];
@@ -236,7 +236,7 @@ void RosDvsEmulator::readout()
 
 
 
-//            std::cout << "ros::spinOnce now" << std::endl;
+            //            std::cout << "ros::spinOnce now" << std::endl;
             ros::spinOnce();
         }
         catch (boost::thread_interrupted&)

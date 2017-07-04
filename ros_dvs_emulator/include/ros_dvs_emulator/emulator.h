@@ -23,7 +23,7 @@
 #include <boost/thread.hpp>
 #include <boost/thread/thread_time.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-// boost shared mem
+// boost shared memory access
 #include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/interprocess/mapped_region.hpp>
 #include <boost/interprocess/sync/scoped_lock.hpp>
@@ -44,6 +44,13 @@
 // plot/log data
 #include <fstream>      // std::ofstream
 
+//****************************************************************
+///! Structs
+//****************************************************************
+
+//! struct that is kept in shared memory
+//! ATTENTION: changes here need to be performed in TORCS main.cpp
+//! as well, where frames are saved to shared memory
 struct shared_mem_emul
 {
     shared_mem_emul() :
@@ -55,81 +62,113 @@ struct shared_mem_emul
         mutex()
     {
     }
+    //! time stamp of newly acquired frame
     double timeNew;
+    //! time stamp of last frame
     double timeRef;
+    //! RGBA values of newly acquired frame
     unsigned char imageNew[image_width*image_height*4];
+    //! log(luminance) value of reference frame (last event generated)
     double imageRef[image_width*image_height];
 
-    //boolean updated when new frame was written
+    //! true when new frame was written
     bool frameUpdated;
 
-    //Mutex to protect access to the queue
+    //! Mutex to protect access to the queue
     boost::interprocess::interprocess_mutex mutex;
 
-    //Condition to wait when the frame was not updated
+    //! Condition to wait on when the frame was not updated
     boost::interprocess::interprocess_condition  condNew;
 };
+
 
 namespace ros_dvs_emulator {
 
 class RosDvsEmulator {
 public:
     RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private);
-  RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private, shared_mem_emul * dataShrd_);
-  ~RosDvsEmulator();
-
-  inline double linlog(double arg)
-  {
-      if (arg>linLogLim)
-      {
-          return log(arg);
-      }
-      else
-          return log(linLogLim)/linLogLim*arg;
-  }
-
-  double linlog(uint16_t arg);
-
+    RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private, shared_mem_emul * dataShrd_);
+    ~RosDvsEmulator();
 
 private:
 
-  void readout();
+    //****************************************************************
+    ///! Emulator functions
+    //****************************************************************
+    //! perform logarithmic scaling with linear scaling for values
+    //! close to zero (expansive for log)
+    inline double linlog(double arg)
+    {
+        if (arg>linLogLim)
+        {
+            return log(arg);
+        }
+        else
+            return log(linLogLim)/linLogLim*arg;
+    }
 
-  uint64_t countPackages;
+    //! linear/logarithmic scaling performed via lookup table
+    double linlog(uint16_t arg);
 
-  ros::NodeHandle nh_;
-  ros::Publisher event_array_pub_;
+    //! performs emulation operation when new frame is available
+    //! in shared memory, access managed via mutex and conditions
+    void emulateFrame();
 
-  volatile bool running_;
+    //****************************************************************
+    ///! ROS related runtime variables
+    //****************************************************************
+    //! ROS node handle
+    ros::NodeHandle nh_;
+    //! ROS publisher construct
+    ros::Publisher event_array_pub_;
 
-  boost::shared_ptr<boost::thread> readout_thread_;
+    volatile bool running_;
 
-  unsigned dvsThresh;
+    boost::shared_ptr<boost::thread> emulate_thread_;
 
-  unsigned streamingRate;
+    //****************************************************************
+    ///! DVS emulation related variables
+    //****************************************************************
+    //! limit to which value linear scale will be applied
+    //! out of range [0,255]
+    double linLogLim;
+    //! lookup table for linlog scaling of illuminance
+    double lookupLinLog[256];
+    //! log(illumination) difference threshold,
+    //! 2DO: make variable
+    unsigned dvsThresh;
+    //! rate at which event packages will be published
+    //! 2DO: determine preference
+    unsigned streamingRate;
+    //! struct accessed in shared memory
+    shared_mem_emul *dataShrd;
 
-  shared_mem_emul *dataShrd;
+    //****************************************************************
+    ///! Performance evaluation variables
+    //****************************************************************
+    //! timer object taking timing measurements
+    Timer t1;
+    //! time for each part of the processing pipeline
+    double tMutex;
+    double tWait;
+    double tProcess;
+    double tPublish;
+    //! evaluated frames, to perform averaging for timings
+    unsigned framesCount;
+    //! amount of events evaluated
+    unsigned eventCount;
+    //! counter that keeps track of generated packages
+    //! receiving side can detect loss of packages
+    uint64_t countPackages;
 
-  Timer t1;
-  double tMutex;
-  double tWait;
-  double tProcess;
-  double tPublish;
-  unsigned framesCount;
-  unsigned eventCount;
-
-  double linLogLim;
-
-  double lookupLinLog[256];
-
-  //****************************************************************
-  ///! Plotting parameters
-  //****************************************************************
-  void logLookupTable ();
-  //! directory for data logging
-  std::string outputDir;
-  //! output stream object for benchmark results logging
-  std::ofstream linLogPlot;
+    //****************************************************************
+    ///! Plotting parameters
+    //****************************************************************
+    void logLookupTable ();
+    //! directory for data logging
+    std::string outputDir;
+    //! output stream object for benchmark results logging
+    std::ofstream linLogPlot;
 
 };
 
