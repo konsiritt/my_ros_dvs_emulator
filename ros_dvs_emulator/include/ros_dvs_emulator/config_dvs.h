@@ -19,18 +19,25 @@
 
 // define dvs variables here
 
-#define image_width 640 //320 //
-#define image_height 480 //240 //
+#define image_width 320 //640 //
+#define image_height 240 //480 //
 
 #define pbo_count 2
 
 // configure pixelBuffer and dvsEmulator:
 #define pixel_format GL_BGRA //Fastest option for map from vram to ram
 #define channel_size 4
-#define dvs_threshold 1.0 //1.3 // 60 for lin values
+
+#define useKatzLogScale 1 //0 //
+#define dvs_threshold 10 //0.22 //1.3 // 60 for lin values 0.22 is similar to what is used in Katz (10 for a range to 255)
 
 // define to what value on linear rgb scale the log should be linear
-#define lin_log_lim 20
+#define lin_log_lim 15
+
+// set relative luminance contribution of rgb components https://en.wikipedia.org/wiki/Relative_luminance
+#define lum_r 0.2126
+#define lum_g 0.7152
+#define lum_b 0.0732
 
 // define streaming rate of event packages in as ROS topic in [Hz]
 #define ros_streaming_rate 200

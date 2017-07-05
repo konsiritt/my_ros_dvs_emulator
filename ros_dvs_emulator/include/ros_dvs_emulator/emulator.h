@@ -101,11 +101,30 @@ private:
     {
         if (arg>linLogLim)
         {
-            return log(arg);
+            return 255/log(255)*log(arg);
         }
         else
-            return log(linLogLim)/linLogLim*arg;
+            return 255/log(255)*log(linLogLim)/linLogLim*arg;
     }
+
+    //! perform logarithmic scaling with linear scaling for values
+    //! close to zero (expansive for log), map to range 0 to 255
+    inline double linlogKatz(double arg)
+    {
+        if (arg>linLogLim)
+        {
+            double a = ((double) 256 - linLogLim) / (log(256) - log(linLogLim));
+            double b = 256 - a *log(256);
+
+
+            return (a * log(arg) + b);
+        }
+        else
+            return arg;
+    }
+
+    //! create lookup table
+    void createLookupLinLog ();
 
     //! linear/logarithmic scaling performed via lookup table
     double linlog(uint16_t arg);

@@ -32,6 +32,8 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private)
 #ifdef interp_events
     interpEvents(interp_timeslots), //2DO: make generic?!
 #endif
+    tMutex(0),
+    tWait(0),
     tProcess(0),
     tPublish(0),
     framesCount(0),
@@ -47,11 +49,8 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private)
 
     dataShrd = dataShrdMain;
 
-    for (uint16_t ii = 0; ii<256; ++ii)
-    {
-        lookupLinLog[ii] = linlog((double) ii);
-    }
-    //    logLookupTable();
+    createLookupLinLog();
+    logLookupTable();
 
     // spawn threads
     running_ = true;
@@ -83,11 +82,8 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private,
         ns = "/dvs";
     event_array_pub_ = nh_.advertise<ros_dvs_msgs::EventArray>(ns + "/events", 1);
 
-    for (uint16_t ii = 0; ii<256; ++ii)
-    {
-        lookupLinLog[ii] = linlog((double) ii);
-    }
-    //    logLookupTable();
+    createLookupLinLog();
+    logLookupTable();
 
     // spawn threads
     running_ = true;
@@ -107,6 +103,22 @@ RosDvsEmulator::~RosDvsEmulator()
 
     //    //Erase shared memory 2DO: does it make sense to remove in both classes?
     //    bip::shared_memory_object::remove("shared_memory");
+}
+
+void RosDvsEmulator::createLookupLinLog()
+{
+
+    for (uint16_t ii = 0; ii<256; ++ii)
+    {
+        if (useKatzLogScale)
+        {
+            lookupLinLog[ii] = linlogKatz((double) ii);
+        }
+        else
+        {
+            lookupLinLog[ii] = linlog((double) ii);
+        }
+    }
 }
 
 double RosDvsEmulator::linlog(uint16_t arg)
@@ -160,7 +172,7 @@ void RosDvsEmulator::emulateFrame()
                 for (int ii=0; ii<sizePic; ++ii)
                 {
                     // 2DO: currently colorspace equally, luminance obtained from three colors equally (unlike humans)
-                    pixelLuminance = linlog((uint16_t) (1.0/3.0*(dataShrd->imageNew[4*ii] + dataShrd->imageNew[4*ii+1] + dataShrd->imageNew[4*ii+2])) )
+                    pixelLuminance = linlog((uint16_t) (lum_b*dataShrd->imageNew[4*ii] + lum_g*dataShrd->imageNew[4*ii+1] + lum_r*dataShrd->imageNew[4*ii+2]) )
                             - dataShrd->imageRef[ii];
 
                     // determine event polarity
@@ -363,7 +375,8 @@ void RosDvsEmulator::logLookupTable()
 
     for (uint16_t ii=0; ii<256; ++ii)
     {
-        linLogPlot << ii << " " << linlog((double) ii) << std::endl;
+        linLogPlot << ii << " " << linlog((double) ii) << " "
+                   << ii << " " << linlogKatz((double) ii)<< std::endl;
     }
 }
 
