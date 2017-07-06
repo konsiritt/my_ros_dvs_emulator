@@ -39,6 +39,13 @@
 
 namespace ros_dvs_benchmark {
 
+//! This is a test class to benchmark sending event packets via ROS topics
+/*!
+ * This class sends packets of the same size for a predefined amount of iterations
+ * After these iterations the packet size is increased
+ * Each packet is sent with a goal frequency [Hz] to a ROS topic
+ *
+ */
 class BenchEmul {
 public:
     BenchEmul(ros::NodeHandle & nh, ros::NodeHandle nh_private);
@@ -46,21 +53,39 @@ public:
 
 private:
 
-    void runBenchmark ();
-
-    void publishPacket(unsigned packetSize);
-
-    uint64_t countPackages;
-
+    //****************************************************************
+    ///! ROS related runtime variables
+    //****************************************************************
+    //! ROS node handle
     ros::NodeHandle nh_;
+    //! ROS publisher construct
     ros::Publisher event_array_pub_;
 
     volatile bool running_;
 
     boost::shared_ptr<boost::thread> readout_thread_;
 
-    unsigned iterations;
+    //****************************************************************
+    ///! Benchmark functions
+    //****************************************************************
+    //! executes the benchmark, with certain range of packet sizes
+    //! and certain amount of iterations for each packet size
+    void runBenchmark();
 
+    //! utility function to publish packet of random events
+    /*!
+     * \brief publishPacket publishes a packet of defined size
+     * \param packetSize specifies the amount of events contained in the packet
+     */
+    void publishPacket(unsigned packetSize);
+
+    //! counts the amount of packets published to track packages
+    //! that are lost during transmission
+    uint64_t countPackages;
+
+    //! amount of iterations over which a mean measurement will be performed
+    unsigned iterations;
+    //! publishing frequency for packets
     unsigned pubFreq;
 
 };

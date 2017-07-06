@@ -50,9 +50,6 @@ BenchEmul::~BenchEmul()
         readout_thread_->join();
         ROS_INFO("threads stopped");
     }
-
-//    //Erase shared memory 2DO: does it make sense to remove in both classes?
-//    bip::shared_memory_object::remove("shared_memory");
 }
 
 void BenchEmul::runBenchmark ()
@@ -123,9 +120,6 @@ void BenchEmul::publishPacket(unsigned packetSize)
 
     event_array_pub_.publish(event_array_msg);  
     event_array_msg->events.clear();
-
-
-
 }
 
 } // namespace

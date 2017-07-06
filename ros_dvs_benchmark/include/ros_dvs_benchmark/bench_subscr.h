@@ -40,7 +40,7 @@ public:
   virtual ~BenchSubscr();
 
   //****************************************************************
-  ///! Service functions
+  ///! ROS Service functions
   //****************************************************************
   //! resets measurements
   bool reset_measurements(ros_dvs_service::GetTime::Request &req,
