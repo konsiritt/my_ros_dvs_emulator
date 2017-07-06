@@ -19,6 +19,9 @@
 #include <ros/ros.h>
 #include <string>
 
+// threshold mismatch generation
+#include <random>
+
 // boost
 #include <boost/thread.hpp>
 #include <boost/thread/thread_time.hpp>
@@ -86,7 +89,6 @@ namespace ros_dvs_emulator {
 
 class RosDvsEmulator {
 public:
-    RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private);
     RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private, shared_mem_emul * dataShrd_);
     ~RosDvsEmulator();
 
@@ -95,16 +97,19 @@ private:
     //****************************************************************
     ///! Emulator functions
     //****************************************************************
+    //! initializes all necessary fields and lookup tables
+    void initEmulator();
+
     //! perform logarithmic scaling with linear scaling for values
     //! close to zero (expansive for log)
     inline double linlog(double arg)
     {
         if (arg>linLogLim)
         {
-            return 255/log(255)*log(arg);
+            return log(arg);
         }
         else
-            return 255/log(255)*log(linLogLim)/linLogLim*arg;
+            return log(linLogLim)/linLogLim*arg;
     }
 
     //! perform logarithmic scaling with linear scaling for values
@@ -113,8 +118,8 @@ private:
     {
         if (arg>linLogLim)
         {
-            double a = ((double) 256 - linLogLim) / (log(256) - log(linLogLim));
-            double b = 256 - a *log(256);
+            double a = ((double) lum_range - linLogLim) / (log(lum_range) - log(linLogLim));
+            double b = lum_range - a *log(lum_range);
 
 
             return (a * log(arg) + b);
@@ -124,9 +129,12 @@ private:
     }
 
     //! create lookup table
-    void createLookupLinLog ();
+    void createLookupLinLog();
 
-    //! linear/logarithmic scaling performed via lookup table
+    //! obtain threshold mismatches per pixel
+    void createThresholdMismatch();
+
+    //! access linear/logarithmic scaling via lookup table
     double linlog(uint16_t arg);
 
     //! performs emulation operation when new frame is available
@@ -152,7 +160,9 @@ private:
     //! out of range [0,255]
     double linLogLim;
     //! lookup table for linlog scaling of luminance
-    double lookupLinLog[256];
+    double lookupLinLog[lum_range];
+    //! standard deviation of threshold value per pixel
+    double deviationThreshold[image_width*image_height];
     //! log(illumination) difference threshold,
     //! 2DO: make variable
     unsigned dvsThresh;

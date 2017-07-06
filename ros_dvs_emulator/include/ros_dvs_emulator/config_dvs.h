@@ -17,39 +17,57 @@
 #ifndef CONFIG_DVS_H
 #define CONFIG_DVS_H
 
-// define dvs variables here
+//! DVS Emulation from TORCS configuration file:
 
+//****************************************************************
+///! FRAME INTERFACE SETTINGS (needs to be adapted in torcs/src/
+///  libs/dvs/config_dvs.h as well, where frames are saved)
+//****************************************************************
+
+// game resolution used: TODO: obtain from shared memory
 #define image_width 320 //640 //
 #define image_height 240 //480 //
-
-#define pbo_count 2
-
-// configure pixelBuffer and dvsEmulator:
-#define pixel_format GL_BGRA //Fastest option for map from vram to ram
+// BGRA: Blue Green Red Alpha channels
 #define channel_size 4
 
-#define useKatzLogScale 1 //0 //
-#define dvs_threshold 10 //0.22 //1.3 // 60 for lin values 0.22 is similar to what is used in Katz (10 for a range to 255)
+// define frames_float if the color values should be obtained in
+// GL_FLOAT [0,1] format from GPU instead of GL_UNSIGNED_BYTE [0,255]
+#define frames_float //TODO: NOT IMPLEMENTED
 
+//****************************************************************
+///! EMULATOR SETTINGS
+//****************************************************************
+
+// use logarithmic scaling as in Katz_2012 in jAER implementation
+#define useKatzLogScale 1 //0 //
+// pixel firing threshold
+#define dvs_threshold 30.0 // 0.1// 0.22 vs Katz (10 for a range to 255)
+// turn on/off use of standard deviation for pixel threshold values
+#define threshold_mismatch 1
+// 1-sigma deviation in percent (DVS: 2.1% of contrast )
+// from https://inilabs.com/products/dynamic-vision-sensors/specifications/
+#define threshold_mismatch_sigma 0.02
 // define to what value on linear rgb scale the log should be linear
 #define lin_log_lim 15
-
-// set relative luminance contribution of rgb components https://en.wikipedia.org/wiki/Relative_luminance
-#define lum_r 0.2126
-#define lum_g 0.7152
-#define lum_b 0.0732
-
-// define streaming rate of event packages in as ROS topic in [Hz]
-#define ros_streaming_rate 200
+// define the luminance range, here 0 to 255
+#define lum_range 256
 
 // define if interpolation between frames is allowed -> multiple events per pixel per frame
 #define interp_events //#undef interp_events //
 // defines the amount of timeslots for interframe interpolation
 #define interp_timeslots 5
 
-// define frames_float if the color values should be obtained in
-// GL_FLOAT [0,1] format from GPU instead of GL_UNSIGNED_BYTE [0,255]
-#define frames_float
+// set relative luminance contribution of rgb components https://en.wikipedia.org/wiki/Relative_luminance
+#define lum_r 0.2126
+#define lum_g 0.7152
+#define lum_b 0.0732
+
+//****************************************************************
+///! EVENT OUTPUT INTERFACE
+//****************************************************************
+
+// define streaming rate of event packages in as ROS topic in [Hz]
+#define ros_streaming_rate 200
 
 #endif // CONFIG_DVS_H
 

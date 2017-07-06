@@ -18,12 +18,14 @@
 
 #include "ros_dvs_emulator/emulator_nodelet.h"
 
+extern  shared_mem_emul * dataShrdMain;
+
 namespace ros_dvs_emulator
 {
 
 void RosDvsEmulatorNodelet::onInit()
 {
-  emulator_ = new ros_dvs_emulator::RosDvsEmulator(getNodeHandle(), getPrivateNodeHandle());
+  emulator_ = new ros_dvs_emulator::RosDvsEmulator(getNodeHandle(), getPrivateNodeHandle(), dataShrdMain);
 
   NODELET_INFO_STREAM("Initialized " <<  getName() << " nodelet.");
 }

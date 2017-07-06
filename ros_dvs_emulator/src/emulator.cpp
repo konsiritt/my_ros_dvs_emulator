@@ -20,43 +20,7 @@
 
 namespace bip = boost::interprocess;
 
-extern  shared_mem_emul * dataShrdMain;
-
 namespace ros_dvs_emulator {
-
-RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private) :
-    nh_(nh),
-    linLogLim(lin_log_lim),
-    dvsThresh(dvs_threshold),
-    streamingRate(ros_streaming_rate),
-#ifdef interp_events
-    interpEvents(interp_timeslots), //2DO: make generic?!
-#endif
-    tMutex(0),
-    tWait(0),
-    tProcess(0),
-    tPublish(0),
-    framesCount(0),
-    eventCount(0),
-    countPackages(0),
-    outputDir("/home/rittk/devel/catkin_torcs_ros/logs/output/ros_dvs_emulator") //2DO: make adaptable
-{
-    // set namespace
-    std::string ns = ros::this_node::getNamespace();
-    if (ns == "/")
-        ns = "/dvs";
-    event_array_pub_ = nh_.advertise<ros_dvs_msgs::EventArray>(ns + "/events", 1);
-
-    dataShrd = dataShrdMain;
-
-    createLookupLinLog();
-    logLookupTable();
-
-    // spawn threads
-    running_ = true;
-    std::cout << "Now spawning threads" << std::endl;
-    emulate_thread_ = boost::shared_ptr< boost::thread >(new boost::thread(boost::bind(&RosDvsEmulator::emulateFrame, this)));
-}
 
 RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private, shared_mem_emul * dataShrd_) :    
     nh_(nh),
@@ -64,7 +28,7 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private,
     dvsThresh(dvs_threshold),
     streamingRate(ros_streaming_rate),
 #ifdef interp_events
-    interpEvents(interp_timeslots), //2DO: make generic?!
+    interpEvents(interp_timeslots), //TODO: make generic?!
 #endif
     dataShrd(dataShrd_),
     tMutex(0),
@@ -74,7 +38,7 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private,
     framesCount(0),
     eventCount(0),
     countPackages(0),
-    outputDir("/home/rittk/devel/catkin_torcs_ros/logs/output/ros_dvs_emulator") //2DO: make adaptable
+    outputDir("/home/rittk/devel/catkin_torcs_ros/logs/output/ros_dvs_emulator") //TODO: make adaptable
 {
     // set namespace
     std::string ns = ros::this_node::getNamespace();
@@ -82,8 +46,7 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private,
         ns = "/dvs";
     event_array_pub_ = nh_.advertise<ros_dvs_msgs::EventArray>(ns + "/events", 1);
 
-    createLookupLinLog();
-    logLookupTable();
+    initEmulator();
 
     // spawn threads
     running_ = true;
@@ -100,15 +63,21 @@ RosDvsEmulator::~RosDvsEmulator()
         emulate_thread_->join();
         ROS_INFO("threads stopped");
     }
+}
 
-    //    //Erase shared memory 2DO: does it make sense to remove in both classes?
-    //    bip::shared_memory_object::remove("shared_memory");
+void RosDvsEmulator::initEmulator()
+{
+    createLookupLinLog();
+
+    createThresholdMismatch();
+
+    logLookupTable();
 }
 
 void RosDvsEmulator::createLookupLinLog()
 {
 
-    for (uint16_t ii = 0; ii<256; ++ii)
+    for (uint16_t ii = 0; ii<lum_range; ++ii)
     {
         if (useKatzLogScale)
         {
@@ -121,17 +90,41 @@ void RosDvsEmulator::createLookupLinLog()
     }
 }
 
-double RosDvsEmulator::linlog(uint16_t arg)
+void RosDvsEmulator::createThresholdMismatch()
 {
-    if (arg < 256)
+    if (threshold_mismatch)
     {
-        return lookupLinLog[arg];
+        std::random_device rd;
+        std::default_random_engine generator(rd());
+        double mean = dvs_threshold;
+        double stddev = dvs_threshold*threshold_mismatch_sigma;
+        std::normal_distribution<double> distribution(mean,stddev);
+
+        for (int ii = 0; ii < image_width*image_height; ++ii)
+        {
+            deviationThreshold[ii] = distribution(generator);
+        }
     }
     else
     {
-        std::cerr << "wrong illuminance value computed" << std::endl;
-        return 0;
+        for (int ii = 0; ii < image_width*image_height; ++ii)
+        {
+            deviationThreshold[ii] = dvs_threshold;
+        }
     }
+}
+
+double RosDvsEmulator::linlog(uint16_t arg)
+{
+    if (arg < 0)
+    {
+        arg = 0;
+    }
+    else if (arg > lum_range)
+    {
+        arg = lum_range - 1;
+    }
+    return lookupLinLog[arg];
 }
 
 void RosDvsEmulator::emulateFrame()
@@ -186,10 +179,10 @@ void RosDvsEmulator::emulateFrame()
 #ifdef interp_events
                     int magnitude = 0;
                     double tempLum = pixelLuminance;
-                    while (tempLum > dvsThresh && magnitude < interp_timeslots)
+                    while (tempLum > deviationThreshold[ii] && magnitude < interp_timeslots)
                     {
                         magnitude++;
-                        tempLum = tempLum - dvsThresh;
+                        tempLum = tempLum - deviationThreshold[ii];
                     }
                     if (magnitude !=0)
                     {
@@ -244,19 +237,19 @@ void RosDvsEmulator::emulateFrame()
                             std::cout << "undefined threshold change" << std::endl;
                         }
 
-                        // update reference frame according to polarity of event
+                        // update reference frame according to polarity of event and amount of events generated
                         if (positiveVal)
                         {
-                            dataShrd->imageRef[ii] = dataShrd->imageRef[ii] + pixelLuminance;
+                            dataShrd->imageRef[ii] = dataShrd->imageRef[ii] + magnitude*deviationThreshold[ii];// pixelLuminance;
                         }
                         else
                         {
-                            dataShrd->imageRef[ii] = dataShrd->imageRef[ii] - pixelLuminance;
+                            dataShrd->imageRef[ii] = dataShrd->imageRef[ii] - magnitude*deviationThreshold[ii];//pixelLuminance;
                         }
 
                     }
 #else
-                    if (pixelLuminance>dvsThresh)
+                    if (pixelLuminance>deviationThreshold[ii])
                     {
 
                         // create ROS event message
@@ -266,6 +259,7 @@ void RosDvsEmulator::emulateFrame()
                         e.ts = ros::Time(dataShrd->timeNew - (dataShrd->timeNew - dataShrd->timeRef)/2);
                         e.polarity = positiveVal;
 
+                        // TODO: currently only updated by difference, not by event represented difference
                         // update reference frame according to polarity of event
                         if (positiveVal)
                         {
@@ -283,9 +277,7 @@ void RosDvsEmulator::emulateFrame()
                 }
 
 #ifdef interp_events
-//                event_array_msg->events.reserve(event_array_msg->events.size() + interpEvents[0].size()
-//                        + interpEvents[1].size() + interpEvents[2].size()
-//                        + interpEvents[3].size() + interpEvents[4].size());
+                // sort different timeslot event packets to achieve monotonous timestamps in the overall sent package
                 for (int ii = 0; ii < interp_timeslots; ++ii)
                 {
                     if (interpEvents[ii].size()!=0)
@@ -336,15 +328,10 @@ void RosDvsEmulator::emulateFrame()
 
                 }
             }
-            //            event_array_pub_.publish(event_array_msg);
-            //            event_array_msg->events.clear();
 
             t1.stop();
             tPublish += t1.getElapsedTimeInMilliSec();
 
-
-
-            //            std::cout << "ros::spinOnce now" << std::endl;
             ros::spinOnce();
         }
         catch (boost::thread_interrupted&)
@@ -373,11 +360,13 @@ void RosDvsEmulator::logLookupTable()
         return;
     }
 
-    for (uint16_t ii=0; ii<256; ++ii)
+    for (uint16_t ii=0; ii<lum_range; ++ii)
     {
         linLogPlot << ii << " " << linlog((double) ii) << " "
-                   << ii << " " << linlogKatz((double) ii)<< std::endl;
+                   << ii << " " << linlogKatz((double) ii) <<  std::endl;
     }
+
+    linLogPlot.close();
 }
 
 } // namespace
