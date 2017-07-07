@@ -39,11 +39,11 @@
 //****************************************************************
 
 // use logarithmic scaling as in Katz_2012 in jAER implementation
-#define useKatzLogScale 1 //0 //
+#define useKatzLogScale true //0 //
 // pixel firing threshold
 #define dvs_threshold 30.0 // 0.1// 0.22 vs Katz (10 for a range to 255)
 // turn on/off use of standard deviation for pixel threshold values
-#define threshold_mismatch 1
+#define threshold_mismatch true
 // 1-sigma deviation in percent (DVS: 2.1% of contrast )
 // from https://inilabs.com/products/dynamic-vision-sensors/specifications/
 #define threshold_mismatch_sigma 0.02
@@ -66,8 +66,21 @@
 ///! EVENT OUTPUT INTERFACE
 //****************************************************************
 
+// save to aedat directly 1; publish via ROS topics 0
+#define save_to_aedat true
+// minimum packet size to save to aedat file after frame processing
+#define save_to_aedat_min_size 1000
 // define streaming rate of event packages in as ROS topic in [Hz]
 #define ros_streaming_rate 200
+// define maximum event package size
+#define ros_max_package 30000
+
+//****************************************************************
+///! I/O BEHAVIOUR
+//****************************************************************
+
+// log performance and event creation frequency stats
+#define emulator_io true
 
 #endif // CONFIG_DVS_H
 

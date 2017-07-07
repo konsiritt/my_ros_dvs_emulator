@@ -33,6 +33,18 @@
 #include <boost/interprocess/sync/interprocess_mutex.hpp>
 #include <boost/interprocess/sync/interprocess_condition.hpp>
 
+// insert current time into logging file
+#include <ctime>
+
+// plot/log data
+#include <cstdint>      // fixed width integer types
+#include <fstream>      // std::ofstream
+#include <iostream>
+#define AEDAT3_FILE_VERSION 2.0
+
+// perform big endian small endian conversions:
+#include <arpa/inet.h>
+
 // messages
 #include <ros_dvs_msgs/Event.h>
 #include <ros_dvs_msgs/EventArray.h>
@@ -87,6 +99,14 @@ struct shared_mem_emul
 
 namespace ros_dvs_emulator {
 
+//! A class that generates address event representation from frames in shared memory
+/*!
+ * \brief The RosDvsEmulator class
+ * this class handles frames written to shared memory by e.g. the car racing simulation
+ * TORCS.
+ * Through access to the struct shared_mem_emul also other sources for frames can be
+ * used to perform a DVS emulation on
+ */
 class RosDvsEmulator {
 public:
     RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private, shared_mem_emul * dataShrd_);
@@ -145,9 +165,7 @@ private:
     ///! ROS related runtime variables
     //****************************************************************
     //! ROS node handle
-    ros::NodeHandle nh_;
-    //! ROS publisher construct
-    ros::Publisher event_array_pub_;
+    ros::NodeHandle nh_;    
 
     volatile bool running_;
 
@@ -177,6 +195,23 @@ private:
     shared_mem_emul *dataShrd;
 
     //****************************************************************
+    ///! DVS event output related
+    //****************************************************************
+    //! ROS publisher construct
+    ros::Publisher event_array_pub_;
+
+    //! Logging functions -> save events in AER-DAT file format
+    int initLogging();
+    int logAer(const int32_t writeDataLittle);
+    int closeLogging();
+
+    //! directory for data logging
+    std::string outputDirAEDat;
+    //! file for logging aerdat event data
+    std::ofstream eventsLog;
+
+
+    //****************************************************************
     ///! Performance evaluation variables
     //****************************************************************
     //! timer object taking timing measurements
@@ -193,6 +228,10 @@ private:
     //! counter that keeps track of generated packages
     //! receiving side can detect loss of packages
     uint64_t countPackages;
+    //! time of last event in current package
+    ros::Time timeLastEventOut;
+    //! time of last performance output
+    ros::Time timeLastPerfOut;
 
     //****************************************************************
     ///! Plotting parameters

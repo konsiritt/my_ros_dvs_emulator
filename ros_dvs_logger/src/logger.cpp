@@ -62,6 +62,7 @@ EventLogger::EventLogger(ros::NodeHandle & nh, ros::NodeHandle nh_private) :
 EventLogger::~EventLogger()
 {
     closePlotting();
+    closeLogging();
 }
 
 bool EventLogger::reset_measurements(ros_dvs_service::GetTime::Request &req,
@@ -175,7 +176,7 @@ void EventLogger::eventsCallback(const ros_dvs_msgs::EventArray::ConstPtr& msg)
     int32_t writeDataLittle = 0;
     int32_t xScreen = 0;
     int32_t yScreen = 0;
-    int32_t onPolarity = 2048; // bit at Position 11 is 1 -> 2^12 = 4096
+    int32_t onPolarity = 2048; // bit at Position 11 is 1 -> 2^11 = 2048
 
     int32_t timeStamp = 0;
 
