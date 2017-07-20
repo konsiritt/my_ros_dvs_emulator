@@ -39,8 +39,8 @@
 //****************************************************************
 
 // use condition for processing frames without loss of potential frames
+// not fit for real-time emulation
 #define no_loss_frame_emulation
-#undef no_loss_frame_emulation //TODO: Not implemented yet!
 // use logarithmic scaling as in Katz_2012 in jAER implementation
 #define use_katz_log_scale true //0 //
 // pixel firing threshold

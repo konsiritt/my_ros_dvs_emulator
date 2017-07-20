@@ -351,6 +351,10 @@ void RosDvsEmulator::emulateFrame()
 #endif
                 //flag that the current new frame has been used
                 dataShrd->frameUpdated = false;
+#ifdef no_loss_frame_emulation
+                // notify the frame creating process to continue with next
+                dataShrd->condProcess.notify_one();
+#endif // no_loss_frame_emulation
 
             } // end scope with lock on mutex of shared memory
 
@@ -431,37 +435,37 @@ void RosDvsEmulator::emulateFrame()
             //****************************************************************
             ///! Status output: logging of stats to terminal every second (simulation time)
             //****************************************************************
-//            ++framesCount;
-//            // perform performance output:
-//            if (emulator_io && timeLastEventOut - timeLastPerfOut > ros::Duration(1) )//((tMutex + tWait + tProcess + tPublish) >= 1000) // (framesCount >= 60) //
-//            {
-//                double deltaTimeOut = (timeLastEventOut - timeLastPerfOut).toSec();
-//                timeLastPerfOut = timeLastEventOut;
-//                std::cout << " " << std::endl;
-//                std::cout << "current event rate: " << eventCount/deltaTimeOut/1000 << "[keps]" << std::endl;
+            ++framesCount;
+            // perform performance output:
+            if (emulator_io && timeLastEventOut - timeLastPerfOut > ros::Duration(1) )//((tMutex + tWait + tProcess + tPublish) >= 1000) // (framesCount >= 60) //
+            {
+                double deltaTimeOut = (timeLastEventOut - timeLastPerfOut).toSec();
+                timeLastPerfOut = timeLastEventOut;
+                std::cout << " " << std::endl;
+                std::cout << "current event rate: " << eventCount/deltaTimeOut/1000 << "[keps]" << std::endl;
 
-//                std::cout << " Average times: \n mutex - \t" << tMutex/framesCount
-//                          << "ms, \n wait - \t"             << tWait/framesCount
-//                          << "ms, \n process - \t"          << tProcess/framesCount
-//                          << "ms, \n publish - \t"           << tPublish/framesCount
-//                          << "ms, \n total - \t"            << (tPublish+tProcess+tWait+tMutex)/framesCount
-//                          << "ms" << std::endl;
+                std::cout << " Average times: \n mutex - \t" << tMutex/framesCount
+                          << "ms, \n wait - \t"             << tWait/framesCount
+                          << "ms, \n process - \t"          << tProcess/framesCount
+                          << "ms, \n publish - \t"           << tPublish/framesCount
+                          << "ms, \n total - \t"            << (tPublish+tProcess+tWait+tMutex)/framesCount
+                          << "ms" << std::endl;
 
-//                std::cout << "\n magnitude 1 events: " << countMag1
-//                          << "\n magnitude 2 events: " << countMag2
-//                          << "\n magnitude 3 events: " << countMag3
-//                          << "\n magnitude 4 events: " << countMag4
-//                          << "\n magnitude 5 events: " << countMag5 << std::endl;
+                std::cout << "\n magnitude 1 events: " << countMag1
+                          << "\n magnitude 2 events: " << countMag2
+                          << "\n magnitude 3 events: " << countMag3
+                          << "\n magnitude 4 events: " << countMag4
+                          << "\n magnitude 5 events: " << countMag5 << std::endl;
 
-//                std::cout << "\n total frames emulated: " << totalFrames << std::endl;
-//                tMutex = 0;
-//                tWait = 0;
-//                tProcess = 0;
-//                tPublish = 0;
-//                framesCount = 0;
-//                eventCount = 0;
+                std::cout << "\n total frames emulated: " << totalFrames << std::endl;
+                tMutex = 0;
+                tWait = 0;
+                tProcess = 0;
+                tPublish = 0;
+                framesCount = 0;
+                eventCount = 0;
 
-//            }
+            }
 
             ros::spinOnce();
 

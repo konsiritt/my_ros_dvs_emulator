@@ -97,6 +97,8 @@ struct shared_mem_emul
 
     //! Condition to wait on when the frame was not updated
     boost::interprocess::interprocess_condition  condNew;
+    //! Condition to wait on when the frame was not processed
+    boost::interprocess::interprocess_condition  condProcess;
 };
 
 
