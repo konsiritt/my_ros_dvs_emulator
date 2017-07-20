@@ -24,6 +24,7 @@ namespace ros_dvs_emulator {
 
 RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private, shared_mem_emul * dataShrd_) :    
     nh_(nh),
+    initializedRef(false),
     linLogLim(lin_log_lim),
     dvsThresh(dvs_threshold),
     streamingRate(ros_streaming_rate),
@@ -31,6 +32,11 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private,
     interpEvents(interp_timeslots), //TODO: make generic?!
 #endif
     dataShrd(dataShrd_),
+    countMag1(0),
+    countMag2(0),
+    countMag3(0),
+    countMag4(0),
+    countMag5(0),
     outputDirAEDat("/home/rittk/devel/catkin_torcs_ros/logs/output/aedat"),
     tMutex(0),
     tWait(0),
@@ -41,6 +47,7 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private,
     countPackages(0),
     timeLastEventOut(0),
     timeLastPerfOut(0),
+    totalFrames(0),
     outputDir("/home/rittk/devel/catkin_torcs_ros/logs/output/ros_dvs_emulator") //TODO: make adaptable
 {
     // set namespace
@@ -137,6 +144,7 @@ void RosDvsEmulator::emulateFrame()
     ros_dvs_msgs::EventArrayPtr event_array_msg(new ros_dvs_msgs::EventArray());
     event_array_msg->height = image_height; //2DO: get dynamically
     event_array_msg->width = image_width;
+    int sizePic = event_array_msg->height*event_array_msg->width;
 
     boost::posix_time::ptime next_send_time = boost::posix_time::microsec_clock::local_time();
     boost::posix_time::time_duration delta_ = boost::posix_time::microseconds(1e6/streamingRate);
@@ -148,10 +156,14 @@ void RosDvsEmulator::emulateFrame()
             t1.start();
 
             double pixelLuminance = 0;
-            int sizePic = event_array_msg->height*event_array_msg->width;
+            //****************************************************************
+            ///! Emulation of events: through access to shared memory
+            //****************************************************************
             // compute luminance difference for each pixel
             // to do that: lock mutex while reading
             {
+                totalFrames++;
+
                 bip::scoped_lock<bip::interprocess_mutex> lock(dataShrd->mutex);
                 t1.stop();
                 tMutex += t1.getElapsedTimeInMilliSec();
@@ -166,9 +178,18 @@ void RosDvsEmulator::emulateFrame()
                 tWait += t1.getElapsedTimeInMilliSec();
                 t1.start();
 
+                // check for loss of
+
                 // iterate through every pixel in the newly obtained frame
                 for (int ii=0; ii<sizePic; ++ii)
                 {
+                    // for the very first frame: just save reference brightness values and don't emit any events
+                    if (!initializedRef)
+                    {
+                        dataShrd->imageRef[ii] = linlog((uint16_t) (lum_b*dataShrd->imageNew[4*ii] + lum_g*dataShrd->imageNew[4*ii+1] + lum_r*dataShrd->imageNew[4*ii+2]) );
+                        continue;
+                    }
+
                     // 2DO: currently colorspace equally, luminance obtained from three colors equally (unlike humans)
                     pixelLuminance = linlog((uint16_t) (lum_b*dataShrd->imageNew[4*ii] + lum_g*dataShrd->imageNew[4*ii+1] + lum_r*dataShrd->imageNew[4*ii+2]) )
                             - dataShrd->imageRef[ii];
@@ -202,12 +223,14 @@ void RosDvsEmulator::emulateFrame()
                         case 1:
                             e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)/2.0);
                             interpEvents[2].push_back(e);
+                            countMag1++;
                             break;
                         case 2:
                             e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*1.0/3.0);
                             interpEvents[1].push_back(e);
                             e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*2.0/3.0);
                             interpEvents[3].push_back(e);
+                            countMag2++;
                             break;
                         case 3:
                             e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*1.0/3.0);
@@ -216,6 +239,7 @@ void RosDvsEmulator::emulateFrame()
                             interpEvents[2].push_back(e);
                             e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*2.0/3.0);
                             interpEvents[3].push_back(e);
+                            countMag3++;
                             break;
                         case 4:
                             e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*1.0/6.0);
@@ -226,6 +250,7 @@ void RosDvsEmulator::emulateFrame()
                             interpEvents[3].push_back(e);
                             e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*5.0/6.0);
                             interpEvents[4].push_back(e);
+                            countMag4++;
                             break;
                         case 5:
                             e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*1.0/6.0);
@@ -238,6 +263,7 @@ void RosDvsEmulator::emulateFrame()
                             interpEvents[3].push_back(e);
                             e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*5.0/6.0);
                             interpEvents[4].push_back(e);
+                            countMag5++;
                             break;
                         default:
                             std::cout << "undefined threshold change" << std::endl;
@@ -282,6 +308,14 @@ void RosDvsEmulator::emulateFrame()
 #endif
                 } // end iterate through every pixel in the newly obtained frame
 
+                // mark reference frame as initialized
+                if (!initializedRef)
+                {
+                    initializedRef = true;
+                    ros::spinOnce();
+                    continue;
+                }
+
 #ifdef interp_events
                 double checkTotal = 0;
                 // sort different timeslot event packets to achieve monotonous timestamps in the overall sent package
@@ -306,12 +340,19 @@ void RosDvsEmulator::emulateFrame()
 
             } // end scope with lock on mutex of shared memory
 
-            timeLastEventOut = event_array_msg->events.back().ts;
-
+            // obtain time of last generated event for periodic performance output
+            if (event_array_msg->events.size()>0)
+            {
+                timeLastEventOut = event_array_msg->events.back().ts;
+            }
+            //****************************************************************
             t1.stop();
             tProcess += t1.getElapsedTimeInMilliSec();
             t1.start();
 
+            //****************************************************************
+            ///! Output of Events: Interface to ROS or logging to .aedat file
+            //****************************************************************
             // save emulated events directly to file
             if (save_to_aedat && event_array_msg->events.size() > save_to_aedat_min_size)
             {
@@ -369,10 +410,13 @@ void RosDvsEmulator::emulateFrame()
                     next_send_time += delta_;
                 }
             }
-
+            //****************************************************************
             t1.stop();
             tPublish += t1.getElapsedTimeInMilliSec();
 
+            //****************************************************************
+            ///! Status output: logging of stats to terminal every second (simulation time)
+            //****************************************************************
             ++framesCount;
             // perform performance output:
             if (emulator_io && timeLastEventOut - timeLastPerfOut > ros::Duration(1) )//((tMutex + tWait + tProcess + tPublish) >= 1000) // (framesCount >= 60) //
@@ -388,6 +432,14 @@ void RosDvsEmulator::emulateFrame()
                           << "ms, \n publish - \t"           << tPublish/framesCount
                           << "ms, \n total - \t"            << (tPublish+tProcess+tWait+tMutex)/framesCount
                           << "ms" << std::endl;
+
+                std::cout << "\n magnitude 1 events: " << countMag1
+                          << "\n magnitude 2 events: " << countMag2
+                          << "\n magnitude 3 events: " << countMag3
+                          << "\n magnitude 4 events: " << countMag4
+                          << "\n magnitude 5 events: " << countMag5 << std::endl;
+
+                std::cout << "\n total frames emulated: " << totalFrames << std::endl;
                 tMutex = 0;
                 tWait = 0;
                 tProcess = 0;
@@ -405,7 +457,7 @@ void RosDvsEmulator::emulateFrame()
             std::cout << "thread interrupted" << std::endl;
             return;
         }
-    }
+    } //end while(_running)
 }
 
 int RosDvsEmulator::initLogging()

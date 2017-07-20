@@ -74,6 +74,7 @@ struct shared_mem_emul
         imageNew(),
         imageRef(),
         frameUpdated(false),
+        frameIndex(0),
         mutex()
     {
     }
@@ -88,6 +89,8 @@ struct shared_mem_emul
 
     //! true when new frame was written
     bool frameUpdated;
+    //! frame index to keep track of loss of frames saved to memory
+    double frameIndex;
 
     //! Mutex to protect access to the queue
     boost::interprocess::interprocess_mutex mutex;
@@ -151,7 +154,7 @@ private:
     //! create lookup table
     void createLookupLinLog();
 
-    //! obtain threshold mismatches per pixel
+    //! obtain threshold mismatches per pixel, with our without std deviation
     void createThresholdMismatch();
 
     //! access linear/logarithmic scaling via lookup table
@@ -174,6 +177,8 @@ private:
     //****************************************************************
     ///! DVS emulation related variables
     //****************************************************************
+    //! reference frame initialized yet?
+    bool initializedRef;
     //! limit to which value linear scale will be applied
     //! out of range [0,255]
     double linLogLim;
@@ -193,6 +198,13 @@ private:
 #endif
     //! struct accessed in shared memory
     shared_mem_emul *dataShrd;
+
+    //! counters to assess applicability of timeslot choice
+    double countMag1;
+    double countMag2;
+    double countMag3;
+    double countMag4;
+    double countMag5;
 
     //****************************************************************
     ///! DVS event output related
@@ -232,6 +244,9 @@ private:
     ros::Time timeLastEventOut;
     //! time of last performance output
     ros::Time timeLastPerfOut;
+
+    //! total frames, since start of logging
+    unsigned totalFrames;
 
     //****************************************************************
     ///! Plotting parameters

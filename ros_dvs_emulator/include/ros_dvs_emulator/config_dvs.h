@@ -25,8 +25,8 @@
 //****************************************************************
 
 // game resolution used: TODO: obtain from shared memory
-#define image_width 320 //640 //
-#define image_height 240 //480 //
+#define image_width 640 //320 //
+#define image_height 480 //240 //
 // BGRA: Blue Green Red Alpha channels
 #define channel_size 4
 
