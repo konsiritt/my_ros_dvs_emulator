@@ -198,6 +198,8 @@ private:
 #endif
     //! struct accessed in shared memory
     shared_mem_emul *dataShrd;
+    //! counter of last frame index received
+    double lastFrameIndex;
 
     //! counters to assess applicability of timeslot choice
     double countMag1;

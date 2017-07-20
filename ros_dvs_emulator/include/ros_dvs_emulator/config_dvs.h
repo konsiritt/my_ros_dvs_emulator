@@ -38,8 +38,11 @@
 ///! EMULATOR SETTINGS
 //****************************************************************
 
+// use condition for processing frames without loss of potential frames
+#define no_loss_frame_emulation
+#undef no_loss_frame_emulation //TODO: Not implemented yet!
 // use logarithmic scaling as in Katz_2012 in jAER implementation
-#define useKatzLogScale true //0 //
+#define use_katz_log_scale true //0 //
 // pixel firing threshold
 #define dvs_threshold 30.0 // 0.1// 0.22 vs Katz (10 for a range to 255)
 // turn on/off use of standard deviation for pixel threshold values

@@ -32,6 +32,7 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private,
     interpEvents(interp_timeslots), //TODO: make generic?!
 #endif
     dataShrd(dataShrd_),
+    lastFrameIndex(0),
     countMag1(0),
     countMag2(0),
     countMag3(0),
@@ -91,7 +92,7 @@ void RosDvsEmulator::createLookupLinLog()
 
     for (uint16_t ii = 0; ii<lum_range; ++ii)
     {
-        if (useKatzLogScale)
+        if (use_katz_log_scale)
         {
             lookupLinLog[ii] = linlogKatz((double) ii);
         }
@@ -178,7 +179,20 @@ void RosDvsEmulator::emulateFrame()
                 tWait += t1.getElapsedTimeInMilliSec();
                 t1.start();
 
-                // check for loss of
+                // check for loss of frames in shared memory
+                if (!initializedRef)
+                {
+                    lastFrameIndex = dataShrd->frameIndex;
+                }
+                else if (lastFrameIndex== dataShrd->frameIndex || ++lastFrameIndex==dataShrd->frameIndex)
+                {
+                    // do nothing, all is good
+                }
+                else
+                {
+                    std::cout << dataShrd->frameIndex-lastFrameIndex << " frame(s) in shared memory skipped" << std::endl;
+                    lastFrameIndex = dataShrd->frameIndex;
+                }
 
                 // iterate through every pixel in the newly obtained frame
                 for (int ii=0; ii<sizePic; ++ii)
@@ -417,37 +431,37 @@ void RosDvsEmulator::emulateFrame()
             //****************************************************************
             ///! Status output: logging of stats to terminal every second (simulation time)
             //****************************************************************
-            ++framesCount;
-            // perform performance output:
-            if (emulator_io && timeLastEventOut - timeLastPerfOut > ros::Duration(1) )//((tMutex + tWait + tProcess + tPublish) >= 1000) // (framesCount >= 60) //
-            {
-                double deltaTimeOut = (timeLastEventOut - timeLastPerfOut).toSec();
-                timeLastPerfOut = timeLastEventOut;
-                std::cout << " " << std::endl;
-                std::cout << "current event rate: " << eventCount/deltaTimeOut/1000 << "[keps]" << std::endl;
+//            ++framesCount;
+//            // perform performance output:
+//            if (emulator_io && timeLastEventOut - timeLastPerfOut > ros::Duration(1) )//((tMutex + tWait + tProcess + tPublish) >= 1000) // (framesCount >= 60) //
+//            {
+//                double deltaTimeOut = (timeLastEventOut - timeLastPerfOut).toSec();
+//                timeLastPerfOut = timeLastEventOut;
+//                std::cout << " " << std::endl;
+//                std::cout << "current event rate: " << eventCount/deltaTimeOut/1000 << "[keps]" << std::endl;
 
-                std::cout << " Average times: \n mutex - \t" << tMutex/framesCount
-                          << "ms, \n wait - \t"             << tWait/framesCount
-                          << "ms, \n process - \t"          << tProcess/framesCount
-                          << "ms, \n publish - \t"           << tPublish/framesCount
-                          << "ms, \n total - \t"            << (tPublish+tProcess+tWait+tMutex)/framesCount
-                          << "ms" << std::endl;
+//                std::cout << " Average times: \n mutex - \t" << tMutex/framesCount
+//                          << "ms, \n wait - \t"             << tWait/framesCount
+//                          << "ms, \n process - \t"          << tProcess/framesCount
+//                          << "ms, \n publish - \t"           << tPublish/framesCount
+//                          << "ms, \n total - \t"            << (tPublish+tProcess+tWait+tMutex)/framesCount
+//                          << "ms" << std::endl;
 
-                std::cout << "\n magnitude 1 events: " << countMag1
-                          << "\n magnitude 2 events: " << countMag2
-                          << "\n magnitude 3 events: " << countMag3
-                          << "\n magnitude 4 events: " << countMag4
-                          << "\n magnitude 5 events: " << countMag5 << std::endl;
+//                std::cout << "\n magnitude 1 events: " << countMag1
+//                          << "\n magnitude 2 events: " << countMag2
+//                          << "\n magnitude 3 events: " << countMag3
+//                          << "\n magnitude 4 events: " << countMag4
+//                          << "\n magnitude 5 events: " << countMag5 << std::endl;
 
-                std::cout << "\n total frames emulated: " << totalFrames << std::endl;
-                tMutex = 0;
-                tWait = 0;
-                tProcess = 0;
-                tPublish = 0;
-                framesCount = 0;
-                eventCount = 0;
+//                std::cout << "\n total frames emulated: " << totalFrames << std::endl;
+//                tMutex = 0;
+//                tWait = 0;
+//                tProcess = 0;
+//                tPublish = 0;
+//                framesCount = 0;
+//                eventCount = 0;
 
-            }
+//            }
 
             ros::spinOnce();
 
