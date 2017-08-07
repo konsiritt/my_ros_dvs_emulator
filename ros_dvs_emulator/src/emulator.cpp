@@ -232,50 +232,53 @@ void RosDvsEmulator::emulateFrame()
                         e.x = ii%event_array_msg->width;
                         e.polarity = positiveVal;
 
+                        // timestep between the two generated frames
+                        double deltaStep = dataShrd->timeNew - dataShrd->timeRef;
+
                         // switch amount of events per intraframe period and synthetically produce according events
                         switch (magnitude) {
                         case 1:
-                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)/2.0);
+                            e.ts = ros::Time(dataShrd->timeRef + deltaStep/2.0);
                             interpEvents[2].push_back(e);
                             countMag1++;
                             break;
                         case 2:
-                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*1.0/3.0);
+                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*1.0/3.0);
                             interpEvents[1].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*2.0/3.0);
+                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*2.0/3.0);
                             interpEvents[3].push_back(e);
                             countMag2++;
                             break;
                         case 3:
-                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*1.0/3.0);
+                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*1.0/3.0);
                             interpEvents[1].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)/2.0);
+                            e.ts = ros::Time(dataShrd->timeRef + deltaStep/2.0);
                             interpEvents[2].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*2.0/3.0);
+                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*2.0/3.0);
                             interpEvents[3].push_back(e);
                             countMag3++;
                             break;
                         case 4:
-                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*1.0/6.0);
+                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*1.0/6.0);
                             interpEvents[0].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*1.0/3.0);
+                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*1.0/3.0);
                             interpEvents[1].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*2.0/3.0);
+                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*2.0/3.0);
                             interpEvents[3].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*5.0/6.0);
+                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*5.0/6.0);
                             interpEvents[4].push_back(e);
                             countMag4++;
                             break;
                         case 5:
-                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*1.0/6.0);
+                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*1.0/6.0);
                             interpEvents[0].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*1.0/3.0);
+                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*1.0/3.0);
                             interpEvents[1].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)/2.0);
+                            e.ts = ros::Time(dataShrd->timeRef + deltaStep/2.0);
                             interpEvents[2].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*2.0/3.0);
+                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*2.0/3.0);
                             interpEvents[3].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + (dataShrd->timeNew - dataShrd->timeRef)*5.0/6.0);
+                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*5.0/6.0);
                             interpEvents[4].push_back(e);
                             countMag5++;
                             break;

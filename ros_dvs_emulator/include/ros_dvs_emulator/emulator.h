@@ -186,7 +186,8 @@ private:
     double linLogLim;
     //! lookup table for linlog scaling of luminance
     double lookupLinLog[lum_range];
-    //! standard deviation of threshold value per pixel
+    //! event generation threshold value per pixel including std deviation
+    //! (on/off) regarding threshold_mismatch
     double deviationThreshold[image_width*image_height];
     //! log(illumination) difference threshold,
     //! 2DO: make variable
