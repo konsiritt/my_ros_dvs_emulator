@@ -33,6 +33,9 @@ RosDvsEmulator::RosDvsEmulator(ros::NodeHandle & nh, ros::NodeHandle nh_private,
 #endif
     dataShrd(dataShrd_),
     lastFrameIndex(0),
+    timeNew(0),
+    timeRef(0),
+    deltaStepTime(0),
     countMag1(0),
     countMag2(0),
     countMag3(0),
@@ -142,57 +145,55 @@ double RosDvsEmulator::linlog(uint16_t arg)
 
 void RosDvsEmulator::emulateFrame()
 {
-    ros_dvs_msgs::EventArrayPtr event_array_msg(new ros_dvs_msgs::EventArray());
+    ros_dvs_msgs::EventArrayPtr event_array_msg(new ros_dvs_msgs::EventArray());    
     event_array_msg->height = image_height; //2DO: get dynamically
     event_array_msg->width = image_width;
     int sizePic = event_array_msg->height*event_array_msg->width;
 
+#if save_to_aedat
     boost::posix_time::ptime next_send_time = boost::posix_time::microsec_clock::local_time();
     boost::posix_time::time_duration delta_ = boost::posix_time::microseconds(1e6/streamingRate);
+#endif
 
     while (running_)
     {
         try
         {
-            t1.start();
+            if (emulator_io) t1.start();
 
             double pixelLuminance = 0;
             //****************************************************************
             ///! Emulation of events: through access to shared memory
             //****************************************************************
             // compute luminance difference for each pixel
-            // to do that: lock mutex while reading
             {
                 totalFrames++;
-
+                // start with: lock mutex while reading
                 bip::scoped_lock<bip::interprocess_mutex> lock(dataShrd->mutex);
-                t1.stop();
-                tMutex += t1.getElapsedTimeInMilliSec();
-                t1.start();
 
+                if (emulator_io) timePartMid(tMutex);
+
+                // wait till notified by frame saving process if no new frame is available to process
                 if (!dataShrd->frameUpdated)
-                {
-                    // wait till notified by frame saving process if no new frame is available to process
+                {                    
                     dataShrd->condNew.wait(lock);
                 }
-                t1.stop();
-                tWait += t1.getElapsedTimeInMilliSec();
-                t1.start();
+
+                if (emulator_io) timePartMid(tWait);
 
                 // check for loss of frames in shared memory
                 if (!initializedRef)
                 {
                     lastFrameIndex = dataShrd->frameIndex;
                 }
-                else if (lastFrameIndex== dataShrd->frameIndex || ++lastFrameIndex==dataShrd->frameIndex)
-                {
-                    // do nothing, all is good
-                }
-                else
-                {
+                else if (++lastFrameIndex != dataShrd->frameIndex)
+                {                    
                     std::cout << dataShrd->frameIndex-lastFrameIndex << " frame(s) in shared memory skipped" << std::endl;
                     lastFrameIndex = dataShrd->frameIndex;
                 }
+
+                // update timestamps for currently evaluated frames
+                updateTimes(dataShrd->timeNew, dataShrd->timeRef);
 
                 // iterate through every pixel in the newly obtained frame
                 for (int ii=0; ii<sizePic; ++ii)
@@ -204,7 +205,7 @@ void RosDvsEmulator::emulateFrame()
                         continue;
                     }
 
-                    // 2DO: currently colorspace equally, luminance obtained from three colors equally (unlike humans)
+                    //TODO: currently colorspace equally, luminance obtained from three colors equally (unlike humans)
                     pixelLuminance = linlog((uint16_t) (lum_b*dataShrd->imageNew[4*ii] + lum_g*dataShrd->imageNew[4*ii+1] + lum_r*dataShrd->imageNew[4*ii+2]) )
                             - dataShrd->imageRef[ii];
 
@@ -217,149 +218,40 @@ void RosDvsEmulator::emulateFrame()
                     pixelLuminance = abs(pixelLuminance);
 
 #ifdef interp_events
-                    int magnitude = 0;
-                    double tempLum = pixelLuminance;
-                    while (tempLum > deviationThreshold[ii] && magnitude < interp_timeslots)
+                    if (pixelLuminance>deviationThreshold[ii])
                     {
-                        magnitude++;
-                        tempLum = tempLum - deviationThreshold[ii];
-                    }
-                    if (magnitude !=0)
-                    {
-                        // create ROS event message
-                        ros_dvs_msgs::Event e;
-                        e.y = (int) ii/event_array_msg->width;
-                        e.x = ii%event_array_msg->width;
-                        e.polarity = positiveVal;
-
-                        // timestep between the two generated frames
-                        double deltaStep = dataShrd->timeNew - dataShrd->timeRef;
-
-                        // switch amount of events per intraframe period and synthetically produce according events
-                        switch (magnitude) {
-                        case 1:
-                            e.ts = ros::Time(dataShrd->timeRef + deltaStep/2.0);
-                            interpEvents[2].push_back(e);
-                            countMag1++;
-                            break;
-                        case 2:
-                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*1.0/3.0);
-                            interpEvents[1].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*2.0/3.0);
-                            interpEvents[3].push_back(e);
-                            countMag2++;
-                            break;
-                        case 3:
-                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*1.0/3.0);
-                            interpEvents[1].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + deltaStep/2.0);
-                            interpEvents[2].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*2.0/3.0);
-                            interpEvents[3].push_back(e);
-                            countMag3++;
-                            break;
-                        case 4:
-                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*1.0/6.0);
-                            interpEvents[0].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*1.0/3.0);
-                            interpEvents[1].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*2.0/3.0);
-                            interpEvents[3].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*5.0/6.0);
-                            interpEvents[4].push_back(e);
-                            countMag4++;
-                            break;
-                        case 5:
-                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*1.0/6.0);
-                            interpEvents[0].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*1.0/3.0);
-                            interpEvents[1].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + deltaStep/2.0);
-                            interpEvents[2].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*2.0/3.0);
-                            interpEvents[3].push_back(e);
-                            e.ts = ros::Time(dataShrd->timeRef + deltaStep*5.0/6.0);
-                            interpEvents[4].push_back(e);
-                            countMag5++;
-                            break;
-                        default:
-                            std::cout << "undefined threshold change" << std::endl;
-                        }
-
-                        // update reference frame according to polarity of event and amount of events generated
-                        if (positiveVal)
-                        {
-                            dataShrd->imageRef[ii] = dataShrd->imageRef[ii] + magnitude*deviationThreshold[ii];// pixelLuminance;
-                        }
-                        else
-                        {
-                            dataShrd->imageRef[ii] = dataShrd->imageRef[ii] - magnitude*deviationThreshold[ii];//pixelLuminance;
-                        }
-
+                        determineEvent(ii, ii%event_array_msg->width, (int) ii/event_array_msg->width,
+                                       pixelLuminance, positiveVal);
                     }
 #else
                     if (pixelLuminance>deviationThreshold[ii])
                     {
-
-                        // create ROS event message
-                        ros_dvs_msgs::Event e;
-                        e.y = (int) ii/event_array_msg->width;
-                        e.x = ii%event_array_msg->width;
-                        e.ts = ros::Time(dataShrd->timeNew - (dataShrd->timeNew - dataShrd->timeRef)/2);
-                        e.polarity = positiveVal;
-
-                        // TODO: currently only updated by difference, not by event represented difference
-                        // update reference frame according to polarity of event
-                        if (positiveVal)
-                        {
-                            dataShrd->imageRef[ii] = dataShrd->imageRef[ii] + pixelLuminance;
-                        }
-                        else
-                        {
-                            dataShrd->imageRef[ii] = dataShrd->imageRef[ii] - pixelLuminance;
-                        }
-
-                        // add event message to message array
-                        event_array_msg->events.push_back(e);
+                        determineEvent(ii, ii%event_array_msg->width, (int) ii/event_array_msg->width,
+                                       pixelLuminance, positiveVal, event_array_msg);
                     }
 #endif
-                } // end iterate through every pixel in the newly obtained frame
+                } // end iterate through every pixel in the newly obtained frame                
 
-                // mark reference frame as initialized
-                if (!initializedRef)
-                {
-                    initializedRef = true;
-                    ros::spinOnce();
-                    continue;
-                }
-
-#ifdef interp_events
-                double checkTotal = 0;
-                // sort different timeslot event packets to achieve monotonous timestamps in the overall sent package
-                for (int ii = 0; ii < interp_timeslots; ++ii)
-                {
-
-                    if (interpEvents[ii].size()!=0)
-                    {
-                        checkTotal += interpEvents[ii].size();
-                        event_array_msg->events.insert(event_array_msg->events.end(),interpEvents[ii].begin(),
-                                                       interpEvents[ii].end());
-                        interpEvents[ii].clear();
-                    }
-                }
-                if (checkTotal > event_array_msg->events.size())
-                {
-                    std::cerr << "sth went wrong concatenating the timeslot events" << std::endl;
-                }
-#endif
                 //flag that the current new frame has been used
                 dataShrd->frameUpdated = false;
-#ifdef no_loss_frame_emulation
+#ifdef no_frame_loss_emulation
                 // notify the frame creating process to continue with next
                 dataShrd->condProcess.notify_one();
-#endif // no_loss_frame_emulation
+#endif // no_frame_loss_emulation
 
             } // end scope with lock on mutex of shared memory
+
+            // for first run of emulator: mark reference frame as initialized
+            if (!initializedRef)
+            {
+                initializedRef = true;
+                ros::spinOnce();
+                continue;
+            }
+
+#ifdef interp_events
+            sortEvents(event_array_msg);
+#endif
 
             // obtain time of last generated event for periodic performance output
             if (event_array_msg->events.size()>0)
@@ -367,9 +259,7 @@ void RosDvsEmulator::emulateFrame()
                 timeLastEventOut = event_array_msg->events.back().ts;
             }
             //****************************************************************
-            t1.stop();
-            tProcess += t1.getElapsedTimeInMilliSec();
-            t1.start();
+            if(emulator_io) timePartMid(tProcess);
 
             //****************************************************************
             ///! Output of Events: Interface to ROS or logging to .aedat file
@@ -379,42 +269,11 @@ void RosDvsEmulator::emulateFrame()
             {
                 eventCount += event_array_msg->events.size();
 
-                int32_t writeDataLittle = 0;
-                int32_t xScreen = 0;
-                int32_t yScreen = 0;
-                int32_t onPolarity = 2048; // bit at Position 11 is 1 -> 2^11 = 2048
-
-                int32_t timeStamp = 0;
-
-                int32_t imageHeight = event_array_msg->height;
-                int32_t imageWidth = event_array_msg->width;
-
-                // perform conversion to 32 bit signed integers for each event created
-                for (int ii = 0; ii < event_array_msg->events.size(); ++ii)
+                if (logAer(event_array_msg))
                 {
-                    xScreen = (imageWidth - 1 - event_array_msg->events[ii].x) << 12;
-                    yScreen = event_array_msg->events[ii].y << 22;
-
-                    writeDataLittle = xScreen | yScreen;
-
-                    if (event_array_msg->events[ii].polarity)
-                    {
-                        writeDataLittle = writeDataLittle | onPolarity;
-                    }
-
-                    timeStamp = (int32_t) event_array_msg->events[ii].ts.sec*1000000 + (int32_t) event_array_msg->events[ii].ts.nsec*1e-3 ;
-                    if (timeStamp < 0 )
-                    {
-                        std::cout<<"Attention, timestamp is " << timeStamp << " but should not be negative" <<std::endl;
-                        std::cout<<"sec: " << event_array_msg->events[ii].ts.sec << "nsec: " << event_array_msg->events[ii].ts.nsec <<std::endl;
-                    }
-
-                    // write ints to file
-                    logAer(writeDataLittle);
-                    logAer(timeStamp);
+                    // clean up after events were saved
+                    event_array_msg->events.clear();
                 }
-                // clean up after events were saved
-                event_array_msg->events.clear();
             }
             // throttle event messages if sent via ROS
             else if (!save_to_aedat && (boost::posix_time::microsec_clock::local_time() > next_send_time ||
@@ -432,43 +291,7 @@ void RosDvsEmulator::emulateFrame()
                 }
             }
             //****************************************************************
-            t1.stop();
-            tPublish += t1.getElapsedTimeInMilliSec();
-
-            //****************************************************************
-            ///! Status output: logging of stats to terminal every second (simulation time)
-            //****************************************************************
-            ++framesCount;
-            // perform performance output:
-            if (emulator_io && timeLastEventOut - timeLastPerfOut > ros::Duration(1) )//((tMutex + tWait + tProcess + tPublish) >= 1000) // (framesCount >= 60) //
-            {
-                double deltaTimeOut = (timeLastEventOut - timeLastPerfOut).toSec();
-                timeLastPerfOut = timeLastEventOut;
-                std::cout << " " << std::endl;
-                std::cout << "current event rate: " << eventCount/deltaTimeOut/1000 << "[keps]" << std::endl;
-
-                std::cout << " Average times: \n mutex - \t" << tMutex/framesCount
-                          << "ms, \n wait - \t"             << tWait/framesCount
-                          << "ms, \n process - \t"          << tProcess/framesCount
-                          << "ms, \n publish - \t"           << tPublish/framesCount
-                          << "ms, \n total - \t"            << (tPublish+tProcess+tWait+tMutex)/framesCount
-                          << "ms" << std::endl;
-
-                std::cout << "\n magnitude 1 events: " << countMag1
-                          << "\n magnitude 2 events: " << countMag2
-                          << "\n magnitude 3 events: " << countMag3
-                          << "\n magnitude 4 events: " << countMag4
-                          << "\n magnitude 5 events: " << countMag5 << std::endl;
-
-                std::cout << "\n total frames emulated: " << totalFrames << std::endl;
-                tMutex = 0;
-                tWait = 0;
-                tProcess = 0;
-                tPublish = 0;
-                framesCount = 0;
-                eventCount = 0;
-
-            }
+            if(emulator_io) timePartEnd(tPublish);
 
             ros::spinOnce();
 
@@ -480,6 +303,155 @@ void RosDvsEmulator::emulateFrame()
         }
     } //end while(_running)
 }
+#ifdef interp_events
+int RosDvsEmulator::determineEvent(const int index, const int xCoord, const int yCoord,
+                                   const double deltaLum, const bool pol)
+{
+    int magnitude = 0;
+    double tempLum = deltaLum;
+    while (tempLum > deviationThreshold[index] && magnitude < interp_timeslots)
+    {
+        magnitude++;
+        tempLum = tempLum - deviationThreshold[index];
+    }
+    if (magnitude !=0)
+    {
+        // create ROS event message
+        ros_dvs_msgs::Event e;
+        e.x = xCoord;
+        e.y = yCoord;
+        e.polarity = pol;
+
+        // switch amount of events per intraframe period and synthetically produce according events
+        switch (magnitude) {
+        case 1:
+            e.ts = tSlot[2];
+            interpEvents[2].push_back(e);
+            countMag1++;
+            break;
+        case 2:
+            e.ts = tSlot[1];
+            interpEvents[1].push_back(e);
+            e.ts = tSlot[3];
+            interpEvents[3].push_back(e);
+            countMag2++;
+            break;
+        case 3:
+            e.ts = tSlot[1];
+            interpEvents[1].push_back(e);
+            e.ts = tSlot[2];
+            interpEvents[2].push_back(e);
+            e.ts = tSlot[3];
+            interpEvents[3].push_back(e);
+            countMag3++;
+            break;
+        case 4:
+            e.ts = tSlot[0];
+            interpEvents[0].push_back(e);
+            e.ts = tSlot[1];
+            interpEvents[1].push_back(e);
+            e.ts = tSlot[3];
+            interpEvents[3].push_back(e);
+            e.ts = tSlot[4];
+            interpEvents[4].push_back(e);
+            countMag4++;
+            break;
+        case 5:
+            e.ts = tSlot[0];
+            interpEvents[0].push_back(e);
+            e.ts = tSlot[1];
+            interpEvents[1].push_back(e);
+            e.ts = tSlot[2];
+            interpEvents[2].push_back(e);
+            e.ts = tSlot[3];
+            interpEvents[3].push_back(e);
+            e.ts = tSlot[4];
+            interpEvents[4].push_back(e);
+            countMag5++;
+            break;
+        default:
+            std::cout << "undefined threshold change" << std::endl;
+        }
+
+        // update reference frame according to polarity of event and amount of events generated
+        if (pol)
+        {
+            if (ref_update_full)
+            {
+                dataShrd->imageRef[index] = dataShrd->imageRef[index] + deltaLum;
+            }
+            else
+            {
+                dataShrd->imageRef[index] = dataShrd->imageRef[index] + magnitude*deviationThreshold[index];
+            }
+        }
+        else
+        {
+            if (ref_update_full)
+            {
+                dataShrd->imageRef[index] = dataShrd->imageRef[index] - deltaLum;
+            }
+            else
+            {
+                dataShrd->imageRef[index] = dataShrd->imageRef[index] - magnitude*deviationThreshold[index];
+            }
+        }
+
+    }
+
+}
+
+int RosDvsEmulator::sortEvents(ros_dvs_msgs::EventArrayPtr& outEvents)
+{
+    double checkTotal = 0;
+    double initialEventAmount = outEvents->events.size();
+    // sort different timeslot event packets to achieve monotonous timestamps in the overall sent package
+    for (int ii = 0; ii < interp_timeslots; ++ii)
+    {
+
+        if (interpEvents[ii].size()!=0)
+        {
+            checkTotal += interpEvents[ii].size();
+            outEvents->events.insert(outEvents->events.end(),interpEvents[ii].begin(),
+                                           interpEvents[ii].end());
+            interpEvents[ii].clear();
+        }
+    }
+    if (checkTotal != outEvents->events.size()-initialEventAmount)
+    {
+        std::cerr << "sth went wrong concatenating the timeslot events, "<< checkTotal <<
+                     " should be in it, " << outEvents->events.size() << " are" << std::endl;
+        return 0;
+    }
+    return 1;
+}
+#else
+int RosDvsEmulator::determineEvent(const int index, const int xCoord, const int yCoord,
+                                   const double deltaLum, const bool pol,
+                                   ros_dvs_msgs::EventArrayPtr& outEvents)
+{
+    // create ROS event message
+    ros_dvs_msgs::Event e;
+    e.x = xCoord;
+    e.y = yCoord;
+    e.ts = tStamp;
+    e.polarity = pol;
+
+    // TODO: currently only updated by difference, not by event represented difference
+    // update reference frame according to polarity of event
+    if (pol)
+    {
+        dataShrd->imageRef[index] = dataShrd->imageRef[index] + deltaLum;
+    }
+    else
+    {
+        dataShrd->imageRef[index] = dataShrd->imageRef[index] - deltaLum;
+    }
+
+    // add event message to message array
+    outEvents->events.push_back(e);
+}
+#endif
 
 int RosDvsEmulator::initLogging()
 {
@@ -524,7 +496,44 @@ int RosDvsEmulator::initLogging()
 return 1;
 }
 
-int RosDvsEmulator::logAer(const int32_t writeDataLittle)
+int RosDvsEmulator::logAer(const ros_dvs_msgs::EventArrayPtr& outEvents)
+{
+    int32_t writeDataLittle = 0;
+    int32_t xScreen = 0;
+    int32_t yScreen = 0;
+    int32_t onPolarity = 2048; // bit at Position 11 is 1 -> 2^11 = 2048
+
+    int32_t timeStamp = 0;
+
+    int32_t imageWidth = outEvents->width;
+
+    // perform conversion to 32 bit signed integers for each event created
+    for (int ii = 0; ii < outEvents->events.size(); ++ii)
+    {
+        xScreen = (imageWidth - 1 - outEvents->events[ii].x) << 12;
+        yScreen = outEvents->events[ii].y << 22;
+
+        writeDataLittle = xScreen | yScreen;
+
+        if (outEvents->events[ii].polarity)
+        {
+            writeDataLittle = writeDataLittle | onPolarity;
+        }
+
+        timeStamp = (int32_t) outEvents->events[ii].ts.sec*1000000 + (int32_t) outEvents->events[ii].ts.nsec*1e-3 ;
+        if (timeStamp < 0 )
+        {
+            std::cout<<"Attention, timestamp is " << timeStamp << " but should not be negative" <<std::endl;
+            std::cout<<"sec: " << outEvents->events[ii].ts.sec << "nsec: " << outEvents->events[ii].ts.nsec <<std::endl;
+        }
+
+        // write ints to file
+        logBinaryAer(writeDataLittle);
+        logBinaryAer(timeStamp);
+    }
+    return 1;
+}
+int RosDvsEmulator::logBinaryAer(const int32_t writeDataLittle)
 {
     int32_t writeDataBig = __builtin_bswap32(writeDataLittle);
     eventsLog.write((char *) (&writeDataBig), 4);
@@ -535,6 +544,53 @@ int RosDvsEmulator::closeLogging()
 {
     eventsLog.close();
     return 1;
+}
+
+void RosDvsEmulator::timePartMid(double& timeIt)
+{
+    t1.stop();
+    timeIt += t1.getElapsedTimeInMilliSec();
+    t1.start();
+}
+void RosDvsEmulator::timePartEnd(double& timeIt)
+{
+    t1.stop();
+    timeIt += t1.getElapsedTimeInMilliSec();
+
+    //****************************************************************
+    ///! Status output: logging of stats to terminal every second (simulation time)
+    //****************************************************************
+    ++framesCount;
+    // perform performance output:
+    if (emulator_io && timeLastEventOut - timeLastPerfOut > ros::Duration(1) )
+    {
+        double deltaTimeOut = (timeLastEventOut - timeLastPerfOut).toSec();
+        timeLastPerfOut = timeLastEventOut;
+        std::cout << " " << std::endl;
+        std::cout << "current event rate: " << eventCount/deltaTimeOut/1000 << "[keps]" << std::endl;
+
+        std::cout << " Average times: \n mutex - \t" << tMutex/framesCount
+                  << "ms, \n wait - \t"             << tWait/framesCount
+                  << "ms, \n process - \t"          << tProcess/framesCount
+                  << "ms, \n process/e - \t"          << tProcess/eventCount
+                  << "ms, \n publish - \t"           << tPublish/framesCount
+                  << "ms, \n total - \t"            << (tPublish+tProcess+tWait+tMutex)/framesCount
+                  << "ms" << std::endl;
+
+        std::cout << "\n magnitude 1 events: " << countMag1
+                  << "\n magnitude 2 events: " << countMag2
+                  << "\n magnitude 3 events: " << countMag3
+                  << "\n magnitude 4 events: " << countMag4
+                  << "\n magnitude 5 events: " << countMag5 << std::endl;
+
+        std::cout << "\n total frames emulated: " << totalFrames << std::endl;
+        tMutex = 0;
+        tWait = 0;
+        tProcess = 0;
+        tPublish = 0;
+        framesCount = 0;
+        eventCount = 0;
+    }
 }
 
 void RosDvsEmulator::logLookupTable()

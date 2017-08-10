@@ -25,8 +25,8 @@
 //****************************************************************
 
 // game resolution used: TODO: obtain from shared memory
-#define image_width 128 //640 //
-#define image_height 128 //480 //
+#define image_width  640 //128 //320//
+#define image_height 480 //128 //240//
 // BGRA: Blue Green Red Alpha channels
 #define channel_size 4
 
@@ -40,7 +40,7 @@
 
 // use condition for processing frames without loss of potential frames
 // not fit for real-time emulation
-#define no_loss_frame_emulation
+#define no_frame_loss_emulation
 // use logarithmic scaling as in Katz_2012 in jAER implementation
 #define use_katz_log_scale true //0 //
 // pixel firing threshold
@@ -60,6 +60,10 @@
 // defines the amount of timeslots for interframe interpolation
 #define interp_timeslots 5
 
+// update the reference frame to match the current frame
+// otherwise the reference is only updated to match the generated events
+#define ref_update_full true
+
 // set relative luminance contribution of rgb components https://en.wikipedia.org/wiki/Relative_luminance
 #define lum_r 1.0/3.0 //0.2126
 #define lum_g 1.0/3.0 //0.7152
@@ -69,7 +73,7 @@
 ///! EVENT OUTPUT INTERFACE
 //****************************************************************
 
-// save to aedat directly 1; publish via ROS topics 0
+// save to aedat directly true; publish via ROS topics false
 #define save_to_aedat true
 // minimum packet size to save to aedat file after frame processing
 #define save_to_aedat_min_size 1000

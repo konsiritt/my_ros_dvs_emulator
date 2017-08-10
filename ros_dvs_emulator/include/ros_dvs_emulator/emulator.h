@@ -153,6 +153,23 @@ private:
             return arg;
     }
 
+    //! updates locally used times
+    inline void updateTimes(double timeNew_, double timeRef_)
+    {
+        timeNew = timeNew_;
+        timeRef = timeRef_;
+        deltaStepTime = timeNew_ - timeRef_;
+#ifdef interp_events
+        //TODO: make emulation (sorting etc.) adaptable to different amount of slots
+        for (int i = 0; i < interp_timeslots; ++i)
+        {
+            tSlot [i] = ros::Time(timeRef + deltaStepTime*(i+1)/(interp_timeslots+1));
+        }
+#else
+        tStamp = ros::Time(timeRef + deltaStepTime/2);
+#endif
+    }
+
     //! create lookup table
     void createLookupLinLog();
 
@@ -165,7 +182,17 @@ private:
     //! performs emulation operation when new frame is available
     //! in shared memory, access managed via mutex and conditions
     void emulateFrame();
-
+#ifdef interp_events
+    //! writes event structure to array of created events
+    int determineEvent(const int index, const int xCoord, const int yCoord,
+                       const double deltaLum, const bool pol);
+    int sortEvents(ros_dvs_msgs::EventArrayPtr& outEvents);
+#else
+    //! overloaded for when timeslots are not used -> directly written to the eventArray
+    int determineEvent(const int index, const int xCoord, const int yCoord,
+                       const double deltaLum, const bool pol,
+                       ros_dvs_msgs::EventArrayPtr& outEvents);
+#endif
     //****************************************************************
     ///! ROS related runtime variables
     //****************************************************************
@@ -198,12 +225,17 @@ private:
 #ifdef interp_events
     //! vectors for different timeslots for interpolating between frames
     std::vector<std::vector<ros_dvs_msgs::Event>> interpEvents;
+    //! quantized timeslots for the amount of interpolated events
+    ros::Time tSlot [interp_timeslots];
+#else
+    ros::Time tStamp;
 #endif
     //! struct accessed in shared memory
     shared_mem_emul *dataShrd;
     //! counter of last frame index received
     double lastFrameIndex;
-
+    //! locally saves currently used timestamps of frames and relative time
+    double timeNew, timeRef, deltaStepTime;
     //! counters to assess applicability of timeslot choice
     double countMag1;
     double countMag2;
@@ -219,7 +251,8 @@ private:
 
     //! Logging functions -> save events in AER-DAT file format
     int initLogging();
-    int logAer(const int32_t writeDataLittle);
+    int logAer(const ros_dvs_msgs::EventArrayPtr& outEvents);
+    int logBinaryAer(const int32_t writeDataLittle);
     int closeLogging();
 
     //! directory for data logging
@@ -231,6 +264,9 @@ private:
     //****************************************************************
     ///! Performance evaluation variables
     //****************************************************************
+    //! timing helper functions that log timing
+    void timePartMid(double& timeIt);
+    void timePartEnd(double& timeIt);
     //! timer object taking timing measurements
     Timer t1;
     //! time for each part of the processing pipeline
