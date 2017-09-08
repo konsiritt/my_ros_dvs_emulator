@@ -86,7 +86,7 @@ void RosDvsEmulator::initEmulator()
 {
     createLookupLinLog();
     createThresholdMismatch();
-    logLookupTable();
+//    logLookupTable();
     initLogging();
 }
 
