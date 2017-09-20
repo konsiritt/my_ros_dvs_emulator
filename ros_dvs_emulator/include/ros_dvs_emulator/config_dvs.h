@@ -25,8 +25,8 @@
 //****************************************************************
 
 // game resolution used: TODO: obtain from shared memory
-#define image_width  320//640 //128 //
-#define image_height 240//480 //128 //
+#define image_width  640 //320//128 //
+#define image_height 480 //240//128 //
 // BGRA: Blue Green Red Alpha channels
 #define channel_size 4
 
@@ -44,7 +44,7 @@
 // use logarithmic scaling as in Katz_2012 in jAER implementation
 #define use_katz_log_scale true //0 //
 // pixel firing threshold
-#define dvs_threshold 40.0 //30.0 // 0.1// 0.22 vs Katz (10 for a range to 255)
+#define dvs_threshold 20.0 //30.0 // 0.1// 0.22 vs Katz (10 for a range to 255)
 // turn on/off use of standard deviation for pixel threshold values
 #define threshold_mismatch true
 // 1-sigma deviation in percent (DVS: 2.1% of contrast )
