@@ -116,14 +116,14 @@ void RosDvsEmulator::createThresholdMismatch()
         double stddev = dvs_threshold*threshold_mismatch_sigma;
         std::normal_distribution<double> distribution(mean,stddev);
 
-        for (int ii = 0; ii < image_width*image_height; ++ii)
+        for (int ii = 0; ii < width_out*height_out; ++ii)
         {
             deviationThreshold[ii] = distribution(generator);
         }
     }
     else
     {
-        for (int ii = 0; ii < image_width*image_height; ++ii)
+        for (int ii = 0; ii < width_out*height_out; ++ii)
         {
             deviationThreshold[ii] = dvs_threshold;
         }
@@ -146,8 +146,8 @@ double RosDvsEmulator::linlog(uint16_t arg)
 void RosDvsEmulator::emulateFrame()
 {
     ros_dvs_msgs::EventArrayPtr event_array_msg(new ros_dvs_msgs::EventArray());    
-    event_array_msg->height = image_height; //2DO: get dynamically
-    event_array_msg->width = image_width;
+    event_array_msg->height = height_out;//image_height; //2DO: get dynamically
+    event_array_msg->width = width_out;//image_width;
     int sizePic = event_array_msg->height*event_array_msg->width;
 
 #if save_to_aedat
@@ -188,7 +188,6 @@ void RosDvsEmulator::emulateFrame()
                 }
                 else if (++lastFrameIndex != dataShrd->frameIndex)
                 {                    
-                    std::cout << dataShrd->frameIndex-lastFrameIndex << " frame(s) in shared memory skipped" << std::endl;
                     lastFrameIndex = dataShrd->frameIndex;
                 }
 
@@ -201,13 +200,40 @@ void RosDvsEmulator::emulateFrame()
                     // for the very first frame: just save reference brightness values and don't emit any events
                     if (!initializedRef)
                     {
-                        dataShrd->imageRef[ii] = linlog((uint16_t) (lum_b*dataShrd->imageNew[4*ii] + lum_g*dataShrd->imageNew[4*ii+1] + lum_r*dataShrd->imageNew[4*ii+2]) );
+                        if (super_sample)
+                        {
+                            dataShrd->imageRef[ii] = linlog((uint16_t)
+                                    ((lum_b*(dataShrd->imageNew[8*ii+4*image_width*(ii/width_out)] + dataShrd->imageNew[8*ii+4+4*image_width*(ii/width_out)] +
+                                    dataShrd->imageNew[8*ii+4*image_width*(ii/width_out+1)] + dataShrd->imageNew[8*ii+4+4*image_width*(ii/width_out+1)])
+                                    + lum_g*(dataShrd->imageNew[8*ii+1+4*image_width*(ii/width_out)] + dataShrd->imageNew[8*ii+5+4*image_width*(ii/width_out)] +
+                                    dataShrd->imageNew[8*ii+1+4*image_width*(ii/width_out+1)] + dataShrd->imageNew[8*ii+5+4*image_width*(ii/width_out+1)])
+                                    + lum_r*(dataShrd->imageNew[8*ii+2+4*image_width*(ii/width_out)] + dataShrd->imageNew[8*ii+6+4*image_width*(ii/width_out)] +
+                                    dataShrd->imageNew[8*ii+2+4*image_width*(ii/width_out+1)] + dataShrd->imageNew[8*ii+6+4*image_width*(ii/width_out+1)]) )/4.0) );
+                        }
+                        else
+                        {
+                            dataShrd->imageRef[ii] = linlog((uint16_t) (lum_b*dataShrd->imageNew[4*ii] + lum_g*dataShrd->imageNew[4*ii+1] + lum_r*dataShrd->imageNew[4*ii+2]) );
+                        }
                         continue;
                     }
 
+                    if (super_sample)
+                    {
                     //TODO: currently colorspace equally, luminance obtained from three colors equally (unlike humans)
-                    pixelLuminance = linlog((uint16_t) (lum_b*dataShrd->imageNew[4*ii] + lum_g*dataShrd->imageNew[4*ii+1] + lum_r*dataShrd->imageNew[4*ii+2]) )
-                            - dataShrd->imageRef[ii];
+                        pixelLuminance = linlog((uint16_t) (
+                                                (lum_b*(dataShrd->imageNew[8*ii+4*image_width*(ii/width_out)] + dataShrd->imageNew[8*ii+4+4*image_width*(ii/width_out)] +
+                                                dataShrd->imageNew[8*ii+4*image_width*(ii/width_out+1)] + dataShrd->imageNew[8*ii+4+4*image_width*(ii/width_out+1)])
+                                               + lum_g*(dataShrd->imageNew[8*ii+1+4*image_width*(ii/width_out)] + dataShrd->imageNew[8*ii+5+4*image_width*(ii/width_out)] +
+                                                dataShrd->imageNew[8*ii+1+4*image_width*(ii/width_out+1)] + dataShrd->imageNew[8*ii+5+4*image_width*(ii/width_out+1)])
+                                               + lum_r*(dataShrd->imageNew[8*ii+2+4*image_width*(ii/width_out)] + dataShrd->imageNew[8*ii+6+4*image_width*(ii/width_out)] +
+                                                dataShrd->imageNew[8*ii+2+4*image_width*(ii/width_out+1)] + dataShrd->imageNew[8*ii+6+4*image_width*(ii/width_out+1)]) )/4.0) )
+                                               - dataShrd->imageRef[ii];
+                    }
+                    else
+                    {
+                        pixelLuminance = linlog((uint16_t) (lum_b*dataShrd->imageNew[4*ii] + lum_g*dataShrd->imageNew[4*ii+1] + lum_r*dataShrd->imageNew[4*ii+2]) )
+                                - dataShrd->imageRef[ii];
+                    }
 
                     // determine event polarity
                     bool positiveVal = false;

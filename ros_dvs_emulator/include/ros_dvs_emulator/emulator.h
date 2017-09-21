@@ -85,7 +85,7 @@ struct shared_mem_emul
     //! RGBA values of newly acquired frame
     unsigned char imageNew[image_width*image_height*4];
     //! log(luminance) value of reference frame (last event generated)
-    double imageRef[image_width*image_height];
+    double imageRef[width_out*height_out];
 
     //! true when new frame was written
     bool frameUpdated;
@@ -215,7 +215,7 @@ private:
     double lookupLinLog[lum_range];
     //! event generation threshold value per pixel including std deviation
     //! (on/off) regarding threshold_mismatch
-    double deviationThreshold[image_width*image_height];
+    double deviationThreshold[width_out*height_out];
     //! log(illumination) difference threshold,
     //! 2DO: make variable
     unsigned dvsThresh;
