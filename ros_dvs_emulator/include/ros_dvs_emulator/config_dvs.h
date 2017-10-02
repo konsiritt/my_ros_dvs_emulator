@@ -25,8 +25,8 @@
 //****************************************************************
 
 // game resolution used: TODO: obtain from shared memory
-#define image_width  640 //1280//320//128 //
-#define image_height 480 //960//240//128 //
+#define image_width  640 //320//1280//128 //
+#define image_height 480 //240//960//128 //
 // for when supersampling is used, define downsampled size
 #define super_sample true //false//
 #define width_out 320//640 //1280//
@@ -46,11 +46,11 @@
 // not fit for real-time emulation
 #define no_frame_loss_emulation
 // use logarithmic scaling as in Katz_2012 in jAER implementation
-#define use_katz_log_scale true //0 //
+#define use_katz_log_scale true //false//0 //
 // pixel firing threshold
 #define dvs_threshold 20.0 //30.0 // 0.1// 0.22 vs Katz (10 for a range to 255)
 // turn on/off use of standard deviation for pixel threshold values
-#define threshold_mismatch true
+#define threshold_mismatch false //true//
 // 1-sigma deviation in percent (DVS: 2.1% of contrast )
 // from https://inilabs.com/products/dynamic-vision-sensors/specifications/
 #define threshold_mismatch_sigma 0.02
@@ -66,12 +66,12 @@
 
 // update the reference frame to match the current frame
 // otherwise the reference is only updated to match the generated events
-#define ref_update_full true
+#define ref_update_full false
 
 // set relative luminance contribution of rgb components https://en.wikipedia.org/wiki/Relative_luminance
-#define lum_r 1.0/3.0 //0.2126
-#define lum_g 1.0/3.0 //0.7152
-#define lum_b 1.0/3.0 //0.0732
+#define lum_r 0.299//1.0/3.0 //0.2126//
+#define lum_g 0.587//1.0/3.0 //0.7152//
+#define lum_b 0.114//1.0/3.0 //0.0732// 0.299R + 0.587G+ 0.114B //mueggler
 
 //****************************************************************
 ///! EVENT OUTPUT INTERFACE
